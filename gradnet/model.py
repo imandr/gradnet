@@ -1,29 +1,48 @@
 from .util import make_list
+import numpy as np
+
+class GradientAccumulator(object):
+    
+    def __init__(self, model):
+        self.Model = model
+        
+    def __enter__(self):
+        self.Model.reset_losses()
+        return self
+        
+    def accumulate(self, x, y_=None, data={}):
+        return self.Model.accumulate_gradients(x, y_, data)
+        
+    __call__ = accumulate
+    
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.Model.apply_deltas()
     
 class Model(object):
     
     def __init__(self, inputs, outputs):
         self.Inputs = make_list(inputs)        # inputs
         self.Outputs = make_list(outputs)      # paths
-        self.Y = None
-        self.Losses = []
+        self.Losses = {}        # {name -> (loss, weight)}
         self.OutLosses = []
+        self.Ys = None
         self.Optimizer = None
         self.Metrics = []
-        self.LossValues = []
-        self.OutLossValues = []
+        self.LossValues = {}
         self.AllLayers = []
         seen = set()
         for out in self.Outputs:
             self.AllLayers += list(self._layers_rec(out, seen))
+            
+    def add_loss(self, loss, weight=1.0, name=None):
+        name = name or "loss_%d" % (len(self.Losses),)
+        self.Losses[name] = (loss, weight)
 
-    def compile(self, optimizer=None, output_losses = [], losses=[], metrics=[]):
-        self.Losses = losses
-        self.OutLosses = output_losses
+    def compile(self, optimizer=None, metrics=[]):
         self.Metrics = metrics
         if optimizer is not None:
             for layer in self.AllLayers:
-                layer.Optimizer = optimizer()
+                layer.set_optimizer(optimizer)
         
     def _layers_rec(self, link, seen):
         layer = link.Layer
@@ -37,6 +56,16 @@ class Model(object):
     def layers(self):
         return self.AllLayers
         
+    #
+    # training workflow:
+    #
+    # reset_losses()
+    # loop(
+    #    call(inputs)
+    #    backprop(y_, data)
+    # )
+    # apply_deltas()
+        
     def call(self, inputs):
         inputs = make_list(inputs)
         assert len(inputs) == len(self.Inputs)
@@ -44,24 +73,88 @@ class Model(object):
             o.reset()
         for i, x in zip(self.Inputs, inputs):
             i.set(x)
-        return [o.compute() for o in self.Outputs]
+        self.Ys = [o.compute() for o in self.Outputs]
+        return self.Ys
         
-    def fit(self, y_):
-        y_ = make_list(y_)
-        self.LossValues = [l.compute() for l in self.Losses]
-        self.OutLossValues = [l.compute(yi_) for l, yi_ in zip(self.OutLosses, y_)]
-        for l in self.Losses + self.OutLosses:
-            l.backprop()
+    def backprop(self, y_=None, data={}):
+        assert isinstance(data, dict)
+        d = data.copy()
+        d["y_"] = y_
+        values = {}
+        for name, (loss, weight) in self.Losses.items():
+            values[name] = lv = loss.compute(d)
+            if weight:
+                self.LossValues[name] = self.LossValues[name] + lv
+                loss.backprop(weight)
+        return values
             
+    def reset_losses(self):
+        self.LossValues = {name:0.0 for name in self.Losses.keys()}
+        for o in self.Outputs:
+            o.reset_gradients()
+            
+    def apply_deltas(self):
         for layer in self.AllLayers:
             layer.apply_deltas()
             
-    def train(self, x, y_, metrics=[]):
-        y_ = make_list(y_)
+    def accumulate_gradients(self, x, y_=None, data={}):
         x = make_list(x)
-        y = self.call(x)
-        self.fit(y_)
-        return y, self.OutLossValues + self.LossValues, [m(y_, y[0]) for m in metrics] 
+        self.call(x)
+        return self.backprop(y_, data)
+        
+    def accumulator(self):
+        return GradientAccumulator(self)
+
+    def metrics(self, y_, metrics):
+        #print("metrics: Ys:", self.Ys[:3], "   y_:", y_[:3], "  metrics:", metrics)
+        return [m(y_, self.Ys[0]) for m in metrics] if y_ is not None else None
+            
+    def train_on_batch(self, x, y_=None, data={}, metrics=[]):
+        with self.accumulator() as acc:
+            loss_values = acc.accumulate(x, y_, data)
+        return loss_values, self.metrics(y_, metrics)
+            
+    def fit(self, x, y_=None, data={}, batch_size=None, metrics=[], callbacks=[]):
+        # y_ is a single ndarray, not a list
+        x = make_list(x)
+        n = len(x[0])           # sample size
+
+        assert y_ is None or isinstance(y_, np.ndarray)
+        assert all(len(xi) == n for xi in x)
+        assert y_ is None or len(y_) == n
+        assert all(len(d) == n for d in data.values())
+
+        if batch_size is None:  batch_size = n
+        samples = 0
+        for i in range(0, n, batch_size):
+            #print("fit(): i, batch_size:", i, batch_size)
+            xi = [xx[i:i+batch_size] for xx in x]
+            yi_ = None if y_ is None else y_[i:i+batch_size]
+            data_i = {k:d[i:i+batch_size] for k, d in data.items()}
+            loss_values, mvalues = self.train_on_batch(xi, yi_, data_i, metrics)
+            samples += len(xi[0])
+            for cb in callbacks:
+                #print("callback:", cb)
+                method = None
+                if hasattr(cb, "train_batch_end"):
+                    method = getattr(cb, "train_batch_end")
+                elif callable(cb):
+                    method = cb
+                else:
+                    continue
+                method(samples, loss_values, mvalues)
+            #print(loss_values, mvalues)
+
+        return loss_values, mvalues
+        
+    def layer_gradients(self):
+        out = []
+        for l in self.layers:
+            lst = l.PGradSum
+            #print("Model.layer_gradients: layer:", l,"   grads:", l.PGradSum)
+            if lst:
+                out += lst
+        return out
         
 if __name__ == "__main__":
     from graphs import Input

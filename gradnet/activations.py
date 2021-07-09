@@ -19,7 +19,7 @@ class Activation(Layer):
         
     def grads(self, y_grads, out_state_grads, xs, y, context):
         raise NotImplementedError()
-        return x_grads, None, None
+        return [x_grads], None, None
         
 class LinearActivation(Activation):
 
@@ -30,7 +30,7 @@ class LinearActivation(Activation):
         return inputs[0], None, None
                 
     def grads(self, y_grads, out_state_grads, xs, y, context):
-        return y_grads, None, None
+        return [y_grads], None, None
     
 
 class TanhActivation(Activation):
@@ -42,7 +42,7 @@ class TanhActivation(Activation):
         return np.tanh(x), None, None
         
     def grads(self, y_grads, out_state_grads, xs, y, context):
-        return 1.0-y**2, None, None
+        return [1.0-y**2], None, None
         
 
 class ReLUActivation(Activation):
@@ -54,7 +54,7 @@ class ReLUActivation(Activation):
         return (x + np.abs(x))/2, None, None
         
     def grads(self, y_grads, out_state_grads, xs, y, context):
-        return (y>0.0)*y_grads, None, None
+        return [(y>0.0)*y_grads], None, None
         
 class SoftMaxActivation(Activation):
     
@@ -70,7 +70,9 @@ class SoftMaxActivation(Activation):
         eye = np.eye(n)[None,:,:]
         z = eye - y[:,:,None]
         jac = y[:,None,:]*z
-        return np.dot(jac, y_grads), None, None
+        x_grads = np.einsum("mij,mi->mj", jac, y_grads)
+        #print("SoftMaxActivation.grads: x:", xs[0], "  y_grads:", y_grads, "  x_grads:", x_grads)
+        return [x_grads], None, None
     
 def get_activation(kind, *params, **args):
     a = {

@@ -187,5 +187,5 @@ class LSTM(Layer):
             else:
                 dh0[...] = dHin[:,input_size+1:]
 
-        return dX, dWLSTM/b, dch0
+        return dX, dWLSTM, dch0
         

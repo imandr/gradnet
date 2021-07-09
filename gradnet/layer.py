@@ -1,20 +1,20 @@
 from .util import make_list
+from .optimizers import LayerOptimizer
 
 class Layer(object):
     
-    def __init__(self, name=None, optimizer=None, activation=None):
+    def __init__(self, name=None, activation=None):
         self.Name = name
         self.PGradSum = None
-        self.XGradSum = None
+        self.NSamples = 0
         self.Configured = False
-        self.Optimizer = optimizer
         self.Params = []
         if isinstance(activation, str):
             from .activations import get_activation
             self.Activation = get_activation(activation)
         else:
             self.Activation = activation
-        
+
     def __str__(self):
         return "[Layer %s %s]" % (self.__class__.__name__, self.Name or "")        
 
@@ -29,15 +29,24 @@ class Layer(object):
             self.Configured = True
         else:
             shape = self.check_configuration(inputs)
-        return Link(self, shape, inputs)
+            
+        lnk = Link(self, shape, inputs)
+        if self.Activation is not None:
+            assert isinstance(self.Activation, Layer)
+            lnk = self.Activation.link([lnk])
+        return lnk
     
     __call__ = link
-
-    def reset_grads(self):
-        self.PGradSum = None
-        self.XGradSum = None
     
-    def compute(self, xs, in_state):
+    def set_optimizer(self, param_optimizer):
+        assert self.Configured, f"Layer {self}: Can not set layer optimizer before it is configured"
+        self.Optimizer = LayerOptimizer(self.params, param_optimizer)
+        
+    def reset_gradients(self):
+        self.PGradSum = None
+        self.NSamples = 0
+    
+    def ____compute(self, xs, in_state):
         y, out_state, context = self.call(xs, in_state)
         if self.Activation is not None:
             z, _, a_context = self.Activation.call(y, None)       # assume activation is stateless
@@ -45,42 +54,64 @@ class Layer(object):
             y = z
         return y, out_state, context
         
-    def backprop(self, ygrads, sgrads, xs, y, context):
-        #print(self,".backprop: xs:", xs)
+    def ____backprop(self, ygrads, sgrads, xs, y, context):
         if self.Activation is not None:
             z = y
             y_context, y, a_context = context
             ygrads, _, _ = self.Activation.grads(ygrads, None, [y], z, a_context)       # assumes activation is a stateless and param-less
+            ygrads = ygrads[0]
             x_grads, p_grads, s_in_grads = self.grads(ygrads, sgrads, xs, y, y_context)
         else:
             x_grads, p_grads, s_in_grads = self.grads(ygrads, sgrads, xs, y, context)
+        #print(self,".backprop: ygrads:", ygrads.shape, "   pgrads:", [g.shape for g in p_grads] if p_grads else "-")
+        nsamples = len(ygrads)
         if self.PGradSum is None:
             self.PGradSum = p_grads
-            self.XGradSum = x_grads
+            self.NSamples = nsamples
         else:
             for g, g1 in zip(self.PGradSum, p_grads):
                 g[...] += g1
-            for g, g1 in zip(self.XGradSum, x_grads):
+            self.NSamples += nsamples
+        return x_grads, s_in_grads
+                
+    def compute(self, xs, in_state):
+        y, out_state, context = self.call(xs, in_state)
+        return y, out_state, context
+        
+    def backprop(self, ygrads, sgrads, xs, y, context):
+        x_grads, p_grads, s_in_grads = self.grads(ygrads, sgrads, xs, y, context)
+        #print(self,".backprop: ygrads:", ygrads.shape, "   pgrads:", [g.shape for g in p_grads] if p_grads else "-")
+        nsamples = len(ygrads)
+        if self.PGradSum is None:
+            self.PGradSum = p_grads
+            self.NSamples = nsamples
+        else:
+            for g, g1 in zip(self.PGradSum, p_grads):
                 g[...] += g1
+            self.NSamples += nsamples
         return x_grads, s_in_grads
                 
     def apply_deltas(self):
-        if self.PGradSum is None:
-            #print(f"WARNING: apply_grads() is called for layer {self.Name} while its grads were not initialized. Ignoring")
-            return
+        if self.PGradSum is not None and self.NSamples > 0:
+            #grads = [g/self.NSamples for g in self.PGradSum]
+            self.Optimizer.apply_deltas(self.PGradSum, self.params)
             
-        deltas = self.Optimizer.deltas(self.PGradSum)
-        if False:
-            import math
-            import numpy as np
-            rms = [math.sqrt(np.mean(d*d)) for d in deltas]
-            print(self," deltas rms:", rms)
-        for d, p in zip(deltas, self.params):
-            p[...] += d
+        self.reset_gradients()
             
-        self.PGradSum = None
-            
+    def set_weights(self, weights):
+        if not self.Configured:
+            raise RunTimeError("Layer is not configured")
+        self._set_weights(weights)
+                
+
+
     # overridables
+
+    def _set_weights(self, weights):
+        raise NotImpletemtedError()
+
+    def get_weights(self):
+        raise []
 
     def configure(self, inputs):
         pass
@@ -98,7 +129,7 @@ class Layer(object):
         # y_grads: [mb, ...] - dL/dy[j]
         # returns:
         # x_grads : [mb, ...] - grad per sample
-        # p_grad : [...] - average grad over the minibatch
+        # p_grad : [...] - sum of grad over the minibatch
         # s_in_grads : [mb, ...] - grad per sample
         raise NotImplementedError()
         return x_grads, p_grads, s_in_grads

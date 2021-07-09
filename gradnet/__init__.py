@@ -2,3 +2,4 @@ from .activations import ReLUActivation, LinearActivation, SoftMaxActivation, Ta
 from .graphs import Link, Input
 from .model import Model
 from .layer import Layer
+from .losses import Loss

@@ -71,8 +71,8 @@ class Conv2D(Layer):
 
         #print x.shape, gY.shape
 
-        gW = convolve_xy(x, gY)/n_imgs
-        gb = np.sum(gY, axis=(0, 1, 2))/n_imgs
+        gW = convolve_xy(x, gY)
+        gb = np.sum(gY, axis=(0, 1, 2))
 
         w_flip = self.W[::-1,::-1,:,:]
         w_flip = np.transpose(w_flip, (0,1,3,2))
