@@ -56,7 +56,7 @@ class Link(object):
             i.reset_gradients()
         
     def compute(self):
-        if self.Xs is None:
+        if self.Y is None:
             self.InState = self.OutState
             self.Xs = [i.compute() for i in self.Inputs]
             self.Y, self.OutState, self.Context = self.Layer.compute(self.Xs, self.InState)

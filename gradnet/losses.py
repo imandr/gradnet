@@ -20,7 +20,7 @@ class Loss(object):
         
     @property
     def value(self):
-        return np.mean(self.Values)
+        return np.sum(self.Values)
 
     def backprop(self, weight=1.0):
         assert isinstance(self.Grads, list) and len(self.Grads) == len(self.Inputs),\
@@ -40,9 +40,14 @@ class MSE(Loss):
     def compute(self, data):
         y_ = data["y_"]
         diff = self.Inputs[0].Y - y_
-        #print("MSE.compute: input y:", self.Inputs[0].Y.shape, "   y_:", y_.shape)
-        self.Values = np.mean(diff**2, axis=-1)          
-        self.Grads = [diff*2]          
+        if False:
+            print("MSE.compute: ")
+            print("   y:   ", self.Inputs[0].Y)
+            print("   y_:  ", y_)
+            print("   diff:", diff)
+        self.Values = np.sum(diff**2, axis=-1)          
+        self.Grads = [diff*2]         
+        #print("MSE: dL/dx:", self.Grads[0].shape, self.Grads) 
         return self.value
         
 class CategoricalCrossEntropy(Loss):

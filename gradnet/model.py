@@ -67,6 +67,7 @@ class Model(object):
     # apply_deltas()
         
     def call(self, inputs):
+        #print("------------------- Model.call() ---------------------")
         inputs = make_list(inputs)
         assert len(inputs) == len(self.Inputs)
         for o in self.Outputs:
@@ -83,6 +84,7 @@ class Model(object):
         values = {}
         for name, (loss, weight) in self.Losses.items():
             values[name] = lv = loss.compute(d)
+            #print(f"model.backprop: loss[{name}]:", lv)
             if weight:
                 self.LossValues[name] = self.LossValues[name] + lv
                 loss.backprop(weight)
@@ -94,9 +96,13 @@ class Model(object):
             o.reset_gradients()
             
     def apply_deltas(self):
+        out = []
         for layer in self.AllLayers:
-            layer.apply_deltas()
-            
+            deltas = layer.apply_deltas()
+            if deltas is not None:
+                out.append(deltas)
+        return out
+        
     def accumulate_gradients(self, x, y_=None, data={}):
         x = make_list(x)
         self.call(x)
@@ -155,6 +161,9 @@ class Model(object):
             if lst:
                 out += lst
         return out
+        
+    def input_gradients(self):
+        return [i.XGradSum for i in self.Inputs]
         
 if __name__ == "__main__":
     from graphs import Input

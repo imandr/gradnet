@@ -19,7 +19,8 @@ class Dense(Layer):
         inp = inputs[0]
         self.NIn = inp.Shape[-1]
         #print(self,".configure(): shape -> ", self.Shape)
-        self.W = np.random.random((self.NIn, self.NOut)) - 0.5
+        limit = math.sqrt(6.0/(self.NIn + self.NOut))
+        self.W = np.random.random((self.NIn, self.NOut))*2*limit - limit
         self.B = np.zeros((self.NOut,))
         return inp.Shape[:-1] + (self.NOut,)
         
@@ -47,7 +48,7 @@ class Dense(Layer):
         return np.dot(x, self.W) + self.B, None, None
         
     def grads(self, y_grads, s_out_grads, xs, y, context):
-        #print(self, ".grads: y_grads:", y_grads.shape)
+        #print(self, ".grads: y_grads:", y_grads)
         assert isinstance(xs, list) and len(xs) == 1, "%s.grads(): invalid type of xs: %s %s" % (self, type(xs), xs)
         assert y_grads.shape[-1] == self.NOut
         x = xs[0]
@@ -58,6 +59,7 @@ class Dense(Layer):
         gW = np.dot(inp_flat.T, g_flat)    # [...,n_in],[...,n_out]
         #print("             gW:", gW.shape)
         gb = np.sum(g_flat, axis=0)
+        #print(self, ".grads: gb:", gb)
         gx = np.dot(y_grads, self.W.T)
         return [gx], [gW, gb], None
 

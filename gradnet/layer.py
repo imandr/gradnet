@@ -75,6 +75,7 @@ class Layer(object):
         return x_grads, s_in_grads
                 
     def compute(self, xs, in_state):
+        #print(self,".compute()")
         y, out_state, context = self.call(xs, in_state)
         return y, out_state, context
         
@@ -89,15 +90,18 @@ class Layer(object):
             for g, g1 in zip(self.PGradSum, p_grads):
                 g[...] += g1
             self.NSamples += nsamples
+        #print(self, ".backprop: pgardsum:", self.PGradSum)
+        #print(self, ".backprop: ygrads:", ygrads, " -> x_grads:", x_grads)
         return x_grads, s_in_grads
                 
     def apply_deltas(self):
+        deltas = None
         if self.PGradSum is not None and self.NSamples > 0:
             #grads = [g/self.NSamples for g in self.PGradSum]
-            self.Optimizer.apply_deltas(self.PGradSum, self.params)
-            
+            deltas = self.Optimizer.apply_deltas(self.PGradSum, self.params)
         self.reset_gradients()
-            
+        return deltas
+        
     def set_weights(self, weights):
         if not self.Configured:
             raise RunTimeError("Layer is not configured")
@@ -111,7 +115,7 @@ class Layer(object):
         raise NotImpletemtedError()
 
     def get_weights(self):
-        raise []
+        return None
 
     def configure(self, inputs):
         pass

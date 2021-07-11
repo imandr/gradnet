@@ -6,6 +6,17 @@ from gradnet.losses import get_loss
 from gradnet.metrics import get_metric
 
 import numpy as np
+
+class Callback(object):
+    
+    def __init__(self, print_every=5000, alpha=0.1):
+        self.RunningLoss = self.RunningAccuracy = None
+        self.NextPrint = self.PrintEvery = print_every
+        
+    def train_batch_end(self, nsamples, loss_values, metrics):
+        if nsamples >= self.NextPrint:
+            print("nsamples:", nsamples, "   cce loss:", loss_values["cce"], "   accuracy:", metrics[0])
+            self.NextPrint += self.PrintEvery
     
 from tensorflow.keras.datasets import mnist
 
@@ -25,34 +36,34 @@ y_test = one_hot(y_test, 10)
 
 np.set_printoptions(precision=4, suppress=True)
 
-relu = get_activation("relu")
 sgd = get_optimizer("SGD", learning_rate=0.01, momentum=0.5)
-cce = get_loss("cce")
+adam = get_optimizer("adam")
+#ad = get_optimizer("ad", learning_rate=0.1)
 mse = get_loss("mse")
 accuracy = get_metric("accuracy")
 
-inp = Input((28*28,))
-dense1 = Dense(1024, name="dense1", activation="relu")(inp)
-top = Dense(10, name="top")(dense1)
-probs = get_activation("softmax", name="softmax")(top)
-l = cce(probs)
+def create_model():
+    cce = get_loss("cce")
+    inp = Input((28*28,))
+    dense1 = Dense(1024, name="dense1", activation="relu")(inp)
+    probs = Dense(10, activation="softmax", name="top")(dense1)
+    model = Model([inp], [probs])
+    
+    model.add_loss(cce(probs), name="cce")
+    return model
 
-model = Model([inp], [probs])
-model.compile(sgd, output_losses=[l])
+model = create_model()
+model.compile(adam, metrics=[accuracy])
 
 mbsize = 100
 
 for epoch in range(10):
-    for i in range(0, n_train, mbsize):
-        batch = x_train[i:i+mbsize]
-        labels = y_train[i:i+mbsize]
-        p, losses, _ = model.train(batch, labels, [])
-        
-        
+    #print("main: x:", x_train[:3], "   y:", y_train[:3])
+    model.fit(x_train, y_train, batch_size=mbsize, metrics=[accuracy], callbacks=[Callback()])
     y = model.call(x_test)
     y_ = y_test
     acc = accuracy(y_test, y[0])
-    print("test accuracy:", acc)
+    print("test accuracy:", acc, "   losses:", model.LossValues)
     
 
 

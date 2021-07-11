@@ -36,13 +36,15 @@ class LinearActivation(Activation):
 class TanhActivation(Activation):
     
     def call(self, xs, in_state=None):
+        #print("tanh.call: x:", xs)
         xs = make_list(xs)
         assert len(xs) == 1
         x = xs[0]
         return np.tanh(x), None, None
         
     def grads(self, y_grads, out_state_grads, xs, y, context):
-        return [1.0-y**2], None, None
+        #print("tanh.grads: xs:", xs, "  y:", y, "   y_grads:", y_grads)
+        return [(1.0-y**2)*y_grads], None, None
         
 
 class ReLUActivation(Activation):

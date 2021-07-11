@@ -17,6 +17,7 @@ class LayerOptimizer(object):
             d, c = self.ParamOptimizer.deltas(c, g, p)
             new_contexts.append(c)
             p[...] += d
+            deltas.append(d)
         self.Contexts = new_contexts
         return deltas
         
@@ -45,9 +46,9 @@ class SGD(SingleParamOptimizer):
         
 class Adam(SingleParamOptimizer):
     
-    Epsilon = 1e-6
+    Epsilon = 1e-7
     
-    def __init__(self, learning_rate=0.001, beta1 = 0.9, beta2 = 0.9):
+    def __init__(self, learning_rate=0.001, beta1 = 0.9, beta2 = 0.999):
         self.Eta = learning_rate
         self.B1 = beta1
         self.B2 = beta2
@@ -66,10 +67,27 @@ class Adam(SingleParamOptimizer):
             t = 1
         m_ = m/(1-self.B1**t)
         m2_ = m2/(1-self.B2**t)
-        deltas = -self.Eta*m_/(np.sqrt(m2_ + self.Epsilon))
+        deltas = -self.Eta*m_/(np.sqrt(m2_) + self.Epsilon)
         #print("    deltas:", deltas)
         return deltas, (m, m2, t+1)
         
+class Adagrad(SingleParamOptimizer):
+    
+    Epsilon = 1e-7
+    
+    def __init__(self, learning_rate=0.01, gamma=1.0):
+        self.Eta = learning_rate
+        self.Gamma = gamma
+        
+    def deltas(self, context, grads, params):
+        g2 = grads*grads
+        if context is None:
+            gsum = g2
+        else:
+            gsum = g2 + context
+        gsum *= self.Gamma
+        return -self.Eta*grads/np.sqrt(gsum + self.Epsilon), gsum
+            
 class AcceleratedDescent(SingleParamOptimizer):
     
     Epsilon = 1e-5
@@ -97,6 +115,7 @@ def get_optimizer(name, *params, **args):
     opt_class = {
         "sgd":  SGD,
         "adam": Adam,
+        "adagrad": Adagrad,
         "ad":   AcceleratedDescent
     }
     return opt_class[name.lower()](*params, **args)
