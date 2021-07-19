@@ -59,7 +59,7 @@ class Conv2D(Layer):
         assert shape[-1] == self.filter_shape[-2]
         return (in_shape[0]-self.filter_x+1, in_shape[1]-self.filter_y+1, self.out_channels)
 
-    def call(self, xs, in_state):
+    def compute(self, xs, in_state):
         y = convolve_xw(xs[0], self.W, 'valid') + self.b
         return y, None, None
 
@@ -82,6 +82,17 @@ class Conv2D(Layer):
     @property
     def params(self):
         return [self.W, self.b]
+        
+    def _set_weights(self, weights):
+        w, b = weights
+        #print("Dense._set_weights: w,b:", w.shape, b.shape)
+        assert w.shape == self.W.shape
+        assert b.shape == self.b.shape
+        self.W = w
+        self.b = b 
+        
+    def get_weights(self):
+        return [self.W, self.b]
 
 class Pool(Layer):
     
@@ -101,7 +112,7 @@ class Pool(Layer):
 
     check_config = configure
 
-    def call(self, xs, _):
+    def compute(self, xs, _):
         #print "x:", self.X.dtype, self.X
         assert isinstance(xs, list) and len(xs) == 1
         x = xs[0]

@@ -13,7 +13,7 @@ class Activation(Layer):
 
     check_configuration = configure
     
-    def call(self, inputs, in_state=None):
+    def compute(self, inputs, in_state=None):
         raise NotImplementedError()
         return y, None, None
         
@@ -24,7 +24,7 @@ class Activation(Layer):
 class LinearActivation(Activation):
 
 
-    def call(self, inputs, in_state=None):
+    def compute(self, inputs, in_state=None):
         inputs = make_list(inputs)
         assert len(inputs) == 1
         return inputs[0], None, None
@@ -35,7 +35,7 @@ class LinearActivation(Activation):
 
 class TanhActivation(Activation):
     
-    def call(self, xs, in_state=None):
+    def compute(self, xs, in_state=None):
         #print("tanh.call: x:", xs)
         xs = make_list(xs)
         assert len(xs) == 1
@@ -49,7 +49,7 @@ class TanhActivation(Activation):
 
 class ReLUActivation(Activation):
     
-    def call(self, xs, in_state=None):
+    def compute(self, xs, in_state=None):
         xs = make_list(xs)
         assert len(xs) == 1
         x = xs[0]
@@ -60,7 +60,7 @@ class ReLUActivation(Activation):
         
 class SoftMaxActivation(Activation):
     
-    def call(self, xs, in_state=None):
+    def compute(self, xs, in_state=None):
         xs = make_list(xs)
         assert len(xs) == 1
         x = xs[0]

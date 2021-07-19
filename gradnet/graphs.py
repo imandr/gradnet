@@ -42,11 +42,19 @@ class Link(object):
         
     def reset(self):
         #
-        # get ready for next compute(), but do not reset accumulated grads
+        # get ready for next compute(), but do not reset accumulated grads, nor the state for stateful layers
         #
-        self.Xs = self.Y = self.InState = self.OutState = self.Context = None
+        self.Xs = self.Y = self.Context = None
         for i in self.Inputs:
             i.reset()
+            
+    def reset_state(self):
+        #
+        # reset state for stateful layers
+        #
+        self.InState = self.OutState = None
+        for i in self.Inputs:
+            i.reset_state()
             
     def reset_gradients(self):
         self.StateGrads = None
@@ -70,6 +78,18 @@ class Link(object):
         for xg, i in zip(xgrads, self.Inputs):
             if xg is not None:
                 i.backprop(xg)
+                
+    def links(self, seen=None):
+        if seen is None:    seen = set()
+        for i in self.Inputs:
+            if isinstance(i, Link):
+                for l in i.links(seen):
+                    if not id(l) in seen:
+                        yield l
+                        seen.add(id(l))
+                if not id(i) in seen:
+                    yield i
+                    seen.add(id(i))
             
 class Input(Link):
     def __init__(self, shape, name=None):
@@ -85,7 +105,8 @@ class Input(Link):
         return f"[Input {name} {self.Shape}]"
         
     def set(self, values):
-        assert values.shape[1:] == self.Shape, "Incompatible shape for input layer. Expected %s, got %s" % (('*',)+self.Shape, values.shape)
+        assert len(values.shape)-1 == len(self.Shape)        # remove the minibatch dimension
+        assert all(s is None or s == n for s, n in zip(self.Shape, values.shape[1:])), "Incompatible shape for input layer. Expected %s, got %s" % (('*',)+self.Shape, values.shape)
         self.Values = values
         self.XGradSum = np.zeros(values.shape)
         
@@ -96,5 +117,5 @@ class Input(Link):
         self.XGradSum[...] += grads
         
     def reset_gradsients(self):
-        pass
+        self.XGradSum = None
         

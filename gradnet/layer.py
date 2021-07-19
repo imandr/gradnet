@@ -18,11 +18,19 @@ class Layer(object):
     def __str__(self):
         return "[Layer %s %s]" % (self.__class__.__name__, self.Name or "")        
 
-    def link(self, inputs):
+    def link(self, *inputs):
         from .graphs import Link
+        
+        if len(inputs) == 1:
+            if isinstance(inputs[0], (list, tuple)):
+                inputs = list(inputs[0])
+            else:
+                inputs = [inputs[0]]
+        else:
+            inputs = list(inputs)
     
         #print(self, ".link(): inputs:", inputs)
-        inputs = make_list(inputs)
+
         if not self.Configured:
             shape = self.configure(inputs)
             #print("     self.Shape -> ", self.Shape)
@@ -74,11 +82,6 @@ class Layer(object):
             self.NSamples += nsamples
         return x_grads, s_in_grads
                 
-    def compute(self, xs, in_state):
-        #print(self,".compute()")
-        y, out_state, context = self.call(xs, in_state)
-        return y, out_state, context
-        
     def backprop(self, ygrads, sgrads, xs, y, context):
         x_grads, p_grads, s_in_grads = self.grads(ygrads, sgrads, xs, y, context)
         #print(self,".backprop: ygrads:", ygrads.shape, "   pgrads:", [g.shape for g in p_grads] if p_grads else "-")
@@ -110,14 +113,15 @@ class Layer(object):
 
 
     # overridables
-
+    
     def _set_weights(self, weights):
-        raise NotImpletemtedError()
+        raise NotImplementedError()
 
     def get_weights(self):
         return None
 
     def configure(self, inputs):
+        raise NotImplementedError()
         pass
         # return shape
         
@@ -125,8 +129,8 @@ class Layer(object):
         pass
         # return shape
         
-    def call(self, inputs, in_state):
-        raise NotImplementedError()
+    def compute(self, inputs, in_state):
+        raise NotImplementedError(f"Layer {self.__class__.__name__} does not implement compute() method")
         return y, out_state, context
         
     def grads(self, y_grads, s_out_grads, xs, y, context):

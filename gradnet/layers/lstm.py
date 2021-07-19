@@ -20,20 +20,27 @@ class LSTM(Layer):
         assert len(inputs) == 1
         inp = inputs[0]
         shape = inp.Shape
-        assert len(shape) == 2
+        print("lstm.configure: inp.Shape:", inp.Shape)
+        assert len(shape) == 2, f"Expected shape with 3 dimensions, got {shape}"
         self.Nin = shape[-1]
+
+        print("lstm.configure: Nin:", self.Nin, "  NC:", self.NC)
 
         self.WLSTM = rng.normal(size=(self.Nin + self.NC + 1, 4 * self.NC),
                 scale= 1.0 / np.sqrt(self.Nin + self.NC))
         #print "WLSTM shape=", self.WLSTM.shape
         self.WLSTM[0,:] = 0 # initialize biases to zero
-        self.W = self.WLSTM
         # forget gates get little bit negative bias initially to encourage them to be turned off
         # remember that due to Xavier initialization above, the raw output activations from gates before
         # nonlinearity are zero mean and on order of standard deviation ~1
         self.WLSTM[0,self.NC:2*self.NC] = 3.0
 
-        return (shape[0] if self.ReturnSequences else 1, self.Nout)
+        return (shape[0], self.Nout) if self.ReturnSequences else (self.Nout,)
+
+    @property
+    def params(self):
+        return [self.WLSTM]
+        
 
     def check_config(self, inputs):
         assert len(inputs) == 1
@@ -43,14 +50,16 @@ class LSTM(Layer):
         assert shape[-1] == self.Nin
         return (shape[0] if self.ReturnSequences else 1, self.Nout)
         
-    def call(self, xs, state_in):
+    def compute(self, xs, state_in):
         assert len(xs) == 1
         x = xs[0]
         
         # assume x in [batch, time, width]
         # transpose so that x is [time, batch, width]
         
-        X = np.stranspose(x, (1, 0, 2))
+        #print(self, "x:", x.shape)
+        
+        X = np.transpose(x, (1, 0, 2))
         
         if self.Reversed:
             X = X[::-1,:,:]
@@ -81,7 +90,7 @@ class LSTM(Layer):
         Hin[:,:,1:input_size+1] = X
         Hin[:,:,0] = 1 # bias
         prevh = h0
-        for t in xrange(n):
+        for t in range(n):
             # concat [x,h] as input to the LSTM
             #print "Hin shape:", Hin.shape, "   X shape=",X[t].shape, "   input_size=", input_size
             #Hin[t,:,1:input_size+1] = X[t]
@@ -104,14 +113,16 @@ class LSTM(Layer):
             'IFOGf': IFOGf,
             'IFOG': IFOG,
             'Hin': Hin,
-            'ch0': ch0
+            'ch0': state_in
         }
         y = Hout.transpose((1,0,2))
+        if not self.ReturnSequences:    y = y[:,-1,:]
+        #print(self, "y:", y.shape)
         return y, CHout[:,n-1,:,:], context
         
     def grads(self, y_grads, s_out_grads, xs, y, context):
         dchn = s_out_grads
-
+        #print(self, "y_grads:", y_grads.shape)
         if self.ReturnSequences:
             assert len(y_grads.shape) == 3          # [mb, t, w]
             y_grads = y_grads.transpose((1,0,2))    # -> [t, mb, w]
@@ -141,6 +152,9 @@ class LSTM(Layer):
         # backprop the LSTM
         dIFOG = np.empty(IFOG.shape[1:])        # remove t dimension
         dIFOGf = np.empty(IFOGf.shape[1:])      # remove t dimension
+        
+        #print(self, "IFOGf:", IFOGf.shape, "  dIFOGf:", dIFOGf.shape)
+        
         dWLSTM = np.zeros(self.WLSTM.shape)
         #dHin = np.zeros(Hin.shape[1:])          # remove t dimension
         dC = np.zeros(C.shape)
@@ -171,7 +185,8 @@ class LSTM(Layer):
         
             # backprop activation functions
             dIFOG[:,3*d:] = (1 - IFOGf[t,:,3*d:] ** 2) * dIFOGf[:,3*d:]
-            y = IFOGf[:,:3*d]
+            y = IFOGf[t,:,:3*d]
+            #print(self," dIFOG:", dIFOG.shape, "  y:", y.shape)
             dIFOG[:,:3*d] = (y*(1.0-y)) * dIFOGf[:,:3*d]
         
             # backprop matrix multiply
@@ -186,6 +201,7 @@ class LSTM(Layer):
                     dHout = dHout + y_grads[t-1]
             else:
                 dh0[...] = dHin[:,input_size+1:]
-
-        return dX, dWLSTM, dch0
+                
+        dX = dX.transpose((1,0,2))
+        return [dX], [dWLSTM], dch0
         

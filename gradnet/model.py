@@ -30,6 +30,7 @@ class Model(object):
         self.Metrics = []
         self.LossValues = {}
         self.AllLayers = []
+        self.Map = {}
         seen = set()
         for out in self.Outputs:
             self.AllLayers += list(self._layers_rec(out, seen))
@@ -56,6 +57,12 @@ class Model(object):
     def layers(self):
         return self.AllLayers
         
+    def __setitem__(self, name, v):
+        self.Map[name] = v
+        
+    def __getitem__(self, name):
+        return self.Map[name]
+        
     #
     # training workflow:
     #
@@ -66,7 +73,7 @@ class Model(object):
     # )
     # apply_deltas()
         
-    def call(self, inputs):
+    def compute(self, inputs):
         #print("------------------- Model.call() ---------------------")
         inputs = make_list(inputs)
         assert len(inputs) == len(self.Inputs)
@@ -95,6 +102,10 @@ class Model(object):
         for o in self.Outputs:
             o.reset_gradients()
             
+    def reset_state(self):
+        for o in self.Outputs:
+            o.reset_state()
+            
     def apply_deltas(self):
         out = []
         for layer in self.AllLayers:
@@ -105,7 +116,7 @@ class Model(object):
         
     def accumulate_gradients(self, x, y_=None, data={}):
         x = make_list(x)
-        self.call(x)
+        self.compute(x)
         return self.backprop(y_, data)
         
     def accumulator(self):
@@ -121,6 +132,7 @@ class Model(object):
         return loss_values, self.metrics(y_, metrics)
             
     def fit(self, x, y_=None, data={}, batch_size=None, metrics=[], callbacks=[]):
+        # will always reset state for each batch !
         # y_ is a single ndarray, not a list
         x = make_list(x)
         n = len(x[0])           # sample size
@@ -137,6 +149,7 @@ class Model(object):
             xi = [xx[i:i+batch_size] for xx in x]
             yi_ = None if y_ is None else y_[i:i+batch_size]
             data_i = {k:d[i:i+batch_size] for k, d in data.items()}
+            self.reset_state()
             loss_values, mvalues = self.train_on_batch(xi, yi_, data_i, metrics)
             samples += len(xi[0])
             for cb in callbacks:
@@ -164,6 +177,13 @@ class Model(object):
         
     def input_gradients(self):
         return [i.XGradSum for i in self.Inputs]
+        
+    def links(self):
+        seen = set()
+        for o in self.Outputs:
+            for l in o.links(seen):
+                yield l
+            yield o
         
 if __name__ == "__main__":
     from graphs import Input
@@ -216,7 +236,7 @@ if __name__ == "__main__":
             p, losses, _ = model.train(batch, labels, [])
             
             
-        y = model.call(x_test)
+        y = model.compute(x_test)
         y_ = y_test
         acc = accuracy(y_test, y[0])
         print("test accuracy:", acc)

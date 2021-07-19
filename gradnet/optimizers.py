@@ -111,12 +111,30 @@ class AcceleratedDescent(SingleParamOptimizer):
         #print("ad: f:", f, "   w:", w, "   deltas:", np.mean(deltas*deltas))
         return deltas, (deltas, g)
         
+class Stretch(SingleParamOptimizer):
+    
+    def __init__(self, learning_rate = 0.1, momentum=0.5, stretch=1.5):
+        self.Stretch = stretch
+        self.Eta = learning_rate
+        self.Momentum = momentum
+        
+    def deltas(self, old_deltas, g, param):
+        if old_deltas is not None:
+            old_dir = old_deltas/np.sqrt(np.sum(old_deltas**2, keepdims=True))
+            g_para = old_dir * np.sum(old_dir*g, keepdims=True)
+            g_orto = g - g_para
+            g = self.Stretch*g_para + g_orto
+        deltas = -self.Eta * g
+        if old_deltas is None:
+            old_deltas = deltas
+        deltas += self.Momentum*(old_deltas - deltas)
+        return deltas, deltas        
+
 def get_optimizer(name, *params, **args):
     opt_class = {
         "sgd":  SGD,
         "adam": Adam,
-        "adagrad": Adagrad,
-        "ad":   AcceleratedDescent
+        "adagrad": Adagrad
     }
     return opt_class[name.lower()](*params, **args)
 

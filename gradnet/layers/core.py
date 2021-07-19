@@ -21,14 +21,16 @@ class Dense(Layer):
         #print(self,".configure(): shape -> ", self.Shape)
         limit = math.sqrt(6.0/(self.NIn + self.NOut))
         self.W = np.random.random((self.NIn, self.NOut))*2*limit - limit
+        shape_out = inp.Shape[:-1] + (self.NOut,)
         self.B = np.zeros((self.NOut,))
-        return inp.Shape[:-1] + (self.NOut,)
+        return shape_out
         
     def check_configuration(self, inputs):
         assert len(inputs) == 1
         inp = inputs[0]
         assert inp.Shape[-1] == self.NIn
-        return inp.Shape[:-1] + (self.NOut,)
+        shape_out = inp.Shape[:-1] + (self.NOut,)
+        return shape_out
 
     def _set_weights(self, weights):
         w, b = weights
@@ -41,11 +43,15 @@ class Dense(Layer):
     def get_weights(self):
         return [self.W, self.B]
         
-    def call(self, xs, in_state=None):
+    def compute(self, xs, in_state=None):
         assert isinstance(xs, list) and len(xs) == 1, f"Dense layer accepts single input. Received: {xs}"
         x = xs[0]
         assert x.shape[-1] == self.NIn
-        return np.dot(x, self.W) + self.B, None, None
+        dims = len(x.shape)
+        b = self.B
+        if dims > 1:
+            b = b.reshape((1,)*(dims-1) + (-1,))
+        return np.dot(x, self.W) + b, None, None
         
     def grads(self, y_grads, s_out_grads, xs, y, context):
         #print(self, ".grads: y_grads:", y_grads)
@@ -79,11 +85,85 @@ class Flatten(Layer):
         
     check_config = configure
     
-    def call(self, xs, in_state):
+    def compute(self, xs, in_state):
         x = xs[0]
         n = len(x)
         return x.reshape((n, -1)), None, x.shape
         
     def grads(self, y_grads, s_out_grads, xs, y, context):
         return [y_grads.reshape(context)], None, None
+        
+class Transpose(Layer):
+    
+    params = []
+    def __init__(self, *map, name=None):
+        Layer.__init__(self, name=name)
+        assert all(x in map for x in range(len(map)))   # make sure each index appears once and only once
+        self.MapWithoutBatch = map
+        map = [0] + [m+1 for m in map]          # add th eminibatch dimension
+        self.Map = tuple(map)
+        rev = [0]*len(map)
+        for i, m in enumerate(map):
+            rev[m] = i
+        self.Reversed = tuple(rev)
+    
+    def configure(self, inputs):
+        assert len(inputs) == 1
+        inp = inputs[0]
+        assert len(inp.Shape) == len(self.MapWithoutBatch), \
+                f"Transpose: input shape {inp.Shape} does not match the transpose index map {self.Map}"
+        return tuple(inp.Shape[self.MapWithoutBatch[i]] for i in range(len(inp.Shape)))
+
+    check_config = configure
+    
+    def compute(self, xs, in_state):
+        assert len(xs) == 1
+        return xs.transpose(self.Map)
+        
+    def grads(self, y_grads, s_out_grads, xs, y, context):
+        return [y_grads.transpose(self.Reversed)], None, None
+        
+class Concatenate(Layer):
+    
+    params = []
+    
+    def __init__(self, axis = -1, name=None):
+        Layer.__init__(self, name=name)
+        self.Axis = axis
+
+    def configure(self, inputs):
+        assert len(inputs) >= 2
+        shapes = [inp.Shape for inp in inputs]
+        inp0 = inputs[0]
+        assert all(len(inp.Shape) == len(inp0.Shape) for inp in inputs)
+        ndims = len(inp0.Shape)
+        axis = self.Axis if self.Axis >= 0 else self.Axis + ndims
+        
+        reduced = inp0.Shape[:axis] + inp0.Shape[axis+1:]
+        assert all(inp.Shape[:axis] + inp.Shape[axis+1:] == reduced for inp in inputs)
+        newdim = sum(inp.Shape[axis] for inp in inputs)
+        out_shape = reduced[:axis] + (newdim,) + reduced[axis:]
+        return out_shape
+        
+    check_config = configure
+        
+    def compute(self, xs, in_state):
+        return np.concatenate(xs, axis=self.Axis), None, tuple(x.shape for x in xs)
+        
+    def grads(self, y_grads, s_out_grads, xs, y, context):
+        x_shapes = context
+        ndims = len(x_shapes[0])
+        axis = self.Axis if self.Axis >= 0 else self.Axis + ndims
+        selector = [slice(None)]*ndims
+        i = 0
+        x_grads = []
+        for shape in x_shapes:
+            n = shape[axis]
+            selector[axis] = slice(i,i+n)
+            i += n
+            x_grads.append(y_grads[tuple(selector)])
+        #print("concatente: ygrads:", y_grads," ---> ", x_grads)
+        return x_grads, None, None
+            
+    
         
