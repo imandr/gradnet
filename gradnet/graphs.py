@@ -91,31 +91,3 @@ class Link(object):
                     yield i
                     seen.add(id(i))
             
-class Input(Link):
-    def __init__(self, shape, name=None):
-        self.Shape = shape      # tensor shape without the minibatch dimension
-        self.Values = None
-        self.XGradSum = None
-        self.Inputs = []
-        self.Layer = None
-        self.Name = name
-        
-    def __str__(self):
-        name = self.Name or "(unnamed)"
-        return f"[Input {name} {self.Shape}]"
-        
-    def set(self, values):
-        assert len(values.shape)-1 == len(self.Shape)        # remove the minibatch dimension
-        assert all(s is None or s == n for s, n in zip(self.Shape, values.shape[1:])), "Incompatible shape for input layer. Expected %s, got %s" % (('*',)+self.Shape, values.shape)
-        self.Values = values
-        self.XGradSum = np.zeros(values.shape)
-        
-    def compute(self):
-        return self.Values
-        
-    def backprop(self, grads):
-        self.XGradSum[...] += grads
-        
-    def reset_gradsients(self):
-        self.XGradSum = None
-        

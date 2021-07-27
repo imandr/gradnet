@@ -1,5 +1,7 @@
 from .util import make_list
 import numpy as np
+from .optimizers import get_optimizer
+from .losses import get_loss
 
 class GradientAccumulator(object):
     
@@ -35,13 +37,17 @@ class Model(object):
         for out in self.Outputs:
             self.AllLayers += list(self._layers_rec(out, seen))
             
-    def add_loss(self, loss, weight=1.0, name=None):
+    def add_loss(self, loss, *loss_args, weight=1.0, name=None):
         name = name or "loss_%d" % (len(self.Losses),)
+        if isinstance(loss, str):
+            loss = get_loss(loss)(*loss_args)
         self.Losses[name] = (loss, weight)
 
-    def compile(self, optimizer=None, metrics=[]):
+    def compile(self, optimizer=None, metrics=[], **optimizer_args):
         self.Metrics = metrics
         if optimizer is not None:
+            if isinstance(optimizer, str):
+                optimizer = get_optimizer(optimizer, **optimizer_args)
             for layer in self.AllLayers:
                 layer.set_optimizer(optimizer)
         
@@ -103,10 +109,17 @@ class Model(object):
             o.reset_gradients()
             
     def reset_state(self):
+        #print("Model.reset_state()")
         for o in self.Outputs:
             o.reset_state()
             
     def apply_deltas(self):
+        
+        if False:
+            print("Model.apply_delats: grads from losses:")
+            for name, (l, w) in self.Losses.items():
+                print(name, " weight:", w, "   grads:", l.Grads)
+    
         out = []
         for layer in self.AllLayers:
             deltas = layer.apply_deltas()

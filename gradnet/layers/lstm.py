@@ -1,33 +1,44 @@
 import numpy as np
 import math, time
-from .. import Layer
 from ..util import make_list
 from numpy.random import default_rng
+from .rnn import RNNLayer
 
 rng = default_rng()
 
-class LSTM(Layer):
+class LSTM(RNNLayer):
     
-    def __init__(self, out_size, return_sequences=True, reversed=False, **args):
-        Layer.__init__(self, **args)
+    def __init__(self, out_size, return_sequences=True, **args):
+        
+        RNNLayer.__init__(self, return_sequences=return_sequences, **args)
         
         self.Nout = self.NC = out_size
         self.ReturnSequences = return_sequences
         self.Nin = None
-        self.Reversed = reversed
         
     def configure(self, inputs):
         assert len(inputs) == 1
         inp = inputs[0]
         shape = inp.Shape
-        print("lstm.configure: inp.Shape:", inp.Shape)
+        #print("lstm.configure: inp.Shape:", inp.Shape)
         assert len(shape) == 2, f"Expected shape with 3 dimensions, got {shape}"
         self.Nin = shape[-1]
 
-        print("lstm.configure: Nin:", self.Nin, "  NC:", self.NC)
+        #print("lstm.configure: Nin:", self.Nin, "  NC:", self.NC)
 
-        self.WLSTM = rng.normal(size=(self.Nin + self.NC + 1, 4 * self.NC),
+        self.WLSTM = rng.normal(size=(1 + self.Nin + self.NC, 4 * self.NC),
                 scale= 1.0 / np.sqrt(self.Nin + self.NC))
+                
+        #if self.Nin == self.NC:
+        #    eye = np.eye(self.NC)
+        #    #print("eye=", eye)
+        #    for i in range(1,1 + self.Nin + self.NC,self.NC):
+        #        for j in range(0, 4 * self.NC, self.NC):
+        #            self.WLSTM[i:i+self.Nin, j:j+self.NC] = eye
+        
+        #self.WLSTM[...] = 1.0
+        
+        
         #print "WLSTM shape=", self.WLSTM.shape
         self.WLSTM[0,:] = 0 # initialize biases to zero
         # forget gates get little bit negative bias initially to encourage them to be turned off
@@ -41,167 +52,134 @@ class LSTM(Layer):
     def params(self):
         return [self.WLSTM]
         
-
+    def set_weights(self, weights):
+        self.WLSTM = weights[0]
+        
     def check_config(self, inputs):
         assert len(inputs) == 1
         inp = inputs[0]
         shape = inp.Shape
         assert len(shape) == 2
         assert shape[-1] == self.Nin
-        return (shape[0] if self.ReturnSequences else 1, self.Nout)
+        return self.Shape
         
-    def compute(self, xs, state_in):
-        assert len(xs) == 1
-        x = xs[0]
+    def init_context(self, x, state_in):
+        n, b, input_size = x.shape
+        d = self.NC
+        ch0 = state_in if state_in is not None else np.zeros((2,b,d))
+        c0 = ch0[0]
+        h0 = ch0[1]
         
-        # assume x in [batch, time, width]
-        # transpose so that x is [time, batch, width]
-        
-        #print(self, "x:", x.shape)
-        
-        X = np.transpose(x, (1, 0, 2))
-        
-        if self.Reversed:
-            X = X[::-1,:,:]
-
-        n,b,input_size = X.shape
-        d = self.NC # hidden size
-        if state_in is None:
-            state_in = np.zeros((2, b, d))
-            
-        c0 = state_in[0, :, :]
-        h0 = state_in[1, :, :]
-        
-        # Perform the LSTM forward pass with X as the input
         xphpb = self.WLSTM.shape[0] # x plus h plus bias, lol
-        #print "Hout size:", Hout.shape
+        Hout = np.zeros((n, b, d)) # hidden representation of the LSTM (gated cell content)
         IFOG = np.zeros((n, b, d * 4)) # input, forget, output, gate (IFOG)
         IFOGf = np.zeros((n, b, d * 4)) # after nonlinearity
-        
-        CHout = np.zeros((2, n, b, d))
-        C =     CHout[0, :, :, :]           # view
-        Hout =  CHout[1, :, :, :]           # view
-        
-        #Hout = np.zeros((n, b, d)) # hidden representation of the LSTM (gated cell content)
-        #C = np.zeros((n, b, d)) # cell content
-
+        C = np.zeros((n, b, d)) # cell content
         Ct = np.zeros((n, b, d)) # tanh of cell content
         Hin = np.empty((n, b, xphpb)) # input [1, xt, ht-1] to each tick of the LSTM
-        Hin[:,:,1:input_size+1] = X
+        Hin[:,:,1:input_size+1] = x
         Hin[:,:,0] = 1 # bias
-        prevh = h0
-        for t in range(n):
-            # concat [x,h] as input to the LSTM
-            #print "Hin shape:", Hin.shape, "   X shape=",X[t].shape, "   input_size=", input_size
-            #Hin[t,:,1:input_size+1] = X[t]
-            Hin[t,:,input_size+1:] = prevh
-            # compute all gate activations. dots: (most work is this line)
-            IFOG[t] = Hin[t].dot(self.WLSTM)
-            # non-linearities
-            IFOGf[t,:,:3*d] = 1.0/(1.0+np.exp(-IFOG[t,:,:3*d])) # sigmoids; these are the gates
-            IFOGf[t,:,3*d:] = np.tanh(IFOG[t,:,3*d:]) # tanh
-            # compute the cell activation
-            prevc = C[t-1] if t > 0 else c0
-            C[t] = IFOGf[t,:,:d] * IFOGf[t,:,3*d:] + IFOGf[t,:,d:2*d] * prevc
-            Ct[t] = np.tanh(C[t])
-            Hout[t] = IFOGf[t,:,2*d:3*d] * Ct[t]
-            prevh = Hout[t]
         
         context = {
-            'CHout':CHout,
-            'Ct': Ct,
-            'IFOGf': IFOGf,
-            'IFOG': IFOG,
-            'Hin': Hin,
-            'ch0': state_in
+            "IFOGf":    IFOGf,
+            "IFOG":     IFOG,
+            "C":        C,
+            "Ct":       Ct,
+            "Hin":      Hin,
+            "c0":       c0,
         }
-        y = Hout.transpose((1,0,2))
-        if not self.ReturnSequences:    y = y[:,-1,:]
-        #print(self, "y:", y.shape)
-        return y, CHout[:,n-1,:,:], context
+        return context
+    
+    def init_state(self, mb):
+        return np.zeros((2, mb, self.NC))
         
-    def grads(self, y_grads, s_out_grads, xs, y, context):
-        dchn = s_out_grads
-        #print(self, "y_grads:", y_grads.shape)
-        if self.ReturnSequences:
-            assert len(y_grads.shape) == 3          # [mb, t, w]
-            y_grads = y_grads.transpose((1,0,2))    # -> [t, mb, w]
-            if self.Reversed:
-                y_grads = y_grads[::-1,...]
-            dHout = y_grads[-1]
-        else:
-            assert len(y_grads.shape) == 2          # [mb, w]
-            dHout = y_grads
+    def forward(self, t, xt, s, context):
 
         IFOGf = context['IFOGf']
         IFOG = context['IFOG']
-        CHout = context['CHout']
+        C = context['C']
         Ct = context['Ct']
         Hin = context['Hin']
-        ch0 = context['ch0']
 
-        C = CHout[0]
-        Hout = CHout[1]
-        c0 = ch0[0]
-        h0 = ch0[1]
+        b = len(xt)
 
-        n,b,d = Hout.shape
+        prevc, prevh = s
 
+        b, input_size = xt.shape
+        d = self.NC
+
+        Hin[t,:,input_size+1:] = prevh
+        # compute all gate activations. dots: (most work is this line)
+        IFOG[t] = Hin[t].dot(self.WLSTM)
+        IFOGf[t,:,:3*d] = 1.0/(1.0+np.exp(-IFOG[t,:,:3*d])) # sigmoids; these are the gates
+        IFOGf[t,:,3*d:] = np.tanh(IFOG[t,:,3*d:]) # tanh
+        #print("prevc:", prevc)
+        cout = C[t] = IFOGf[t,:,:d] * IFOGf[t,:,3*d:] + IFOGf[t,:,d:2*d] * prevc
+        #print("C:",C[t])
+        Ct[t] = np.tanh(C[t])
+        #print("Ct:", Ct[t])
+        hout = IFOGf[t,:,2*d:3*d] * Ct[t]
+        #print("y=", hout)
+        return hout, np.array((cout, hout)), context
+        
+    def backward(self, t, gy_t, gstate_t, gw, context):
+        
+        #print(f"--- backward[{t}]")
+
+        b,d = gy_t.shape
+        dc_out, dh_out = gstate_t
+
+        dWLSTM = gw[0]
+        
+        #print("context:", context)
+
+        IFOGf = context['IFOGf']
+        IFOG = context['IFOG']
+        C = context['C']
+        Ct = context['Ct']
+        Hin = context['Hin']
+        c0 = context['c0']
+
+        dIFOGf = np.zeros((b, d*4))
+        dIFOG = np.zeros((b, d*4))
+        
+        dIf = dIFOGf[:,:d]                  # aliases
+        dFf = dIFOGf[:,d:2*d]
+        dGf = dIFOGf[:,2*d:3*d]         
+        dOf = dIFOGf[:,3*d:]
+
+        dHout = dh_out + gy_t
+        #print("gy_t=", gy_t, "  dHout=", dHout)
         input_size = self.WLSTM.shape[0] - d - 1 # -1 due to bias
 
-        # backprop the LSTM
-        dIFOG = np.empty(IFOG.shape[1:])        # remove t dimension
-        dIFOGf = np.empty(IFOGf.shape[1:])      # remove t dimension
-        
-        #print(self, "IFOGf:", IFOGf.shape, "  dIFOGf:", dIFOGf.shape)
-        
-        dWLSTM = np.zeros(self.WLSTM.shape)
-        #dHin = np.zeros(Hin.shape[1:])          # remove t dimension
-        dC = np.zeros(C.shape)
-        dX = np.zeros((n,b,input_size))
-        
-        dch0 = np.zeros((2, b, d))
-        dc0 = dch0[0]            # view
-        dh0 = dch0[1]            # view
-        
-        if dchn is not None: 
-            dC[n-1,:,:] = dchn[0]           # carry over gradients from later
-            dHout += dchn[1]
+        tanhCt = Ct[t]
+        dGf[...] = tanhCt * dHout 
+        #dIFOGf[t,:,2*d:3*d] = tanhCt * dHout    # [nb, Nc] * [nb, Nc] -> [nb, Nc]
+        dC = dc_out + (1-tanhCt**2) * (IFOGf[t,:,2*d:3*d] * dHout)
+        S = c0 if t == 0 else C[t-1]
 
-        for t in reversed(range(n)):
-            tanhCt = Ct[t]
-            dIFOGf[:,2*d:3*d] = tanhCt * dHout     # [nb, Nc] * [nb, Nc] -> [nb, Nc]
-            # backprop tanh non-linearity first then continue backprop
-            dC[t] += (1-tanhCt**2) * (IFOGf[t,:,2*d:3*d] * dHout)
+        dFf[...] = S * dC
+        dS = IFOGf[t,:,d:2*d]*dC
+    
+        dIf[...] = IFOGf[t,:,3*d:] * dC
+        dOf[...] = IFOGf[t,:,:d] * dC
+
+        #print("dIFOGf=", dIFOGf)
+        dIFOG[:,3*d:] = (1 - IFOGf[t,:,3*d:] ** 2) * dOf
+        z = IFOGf[t,:,:3*d] 
+        dIFOG[:,:3*d] = (z*(1.0-z)) * dIFOGf[:,:3*d]
         
-            if t > 0:
-                dIFOGf[:,d:2*d] = C[t-1] * dC[t]
-                dC[t-1] += IFOGf[t,:,d:2*d] * dC[t]
-            else:
-                dIFOGf[:,d:2*d] = c0 * dC[t]
-                dc0[...] = IFOGf[t,:,d:2*d] * dC[t]
-            dIFOGf[:,:d] = IFOGf[t,:,3*d:] * dC[t]
-            dIFOGf[:,3*d:] = IFOGf[t,:,:d] * dC[t]
+        #print("dIFOG=", dIFOG)
+        #print("W=", self.WLSTM)
         
-            # backprop activation functions
-            dIFOG[:,3*d:] = (1 - IFOGf[t,:,3*d:] ** 2) * dIFOGf[:,3*d:]
-            y = IFOGf[t,:,:3*d]
-            #print(self," dIFOG:", dIFOG.shape, "  y:", y.shape)
-            dIFOG[:,:3*d] = (y*(1.0-y)) * dIFOGf[:,:3*d]
-        
-            # backprop matrix multiply
-            dWLSTM += np.dot(Hin[t].transpose(), dIFOG)
-            dHin = dIFOG.dot(self.WLSTM.T)
-        
-            # backprop the identity transforms into Hin
-            dX[t] = dHin[:,1:input_size+1]
-            if t > 0:
-                dHout = dHin[:,input_size+1:]
-                if self.ReturnSequences:
-                    dHout = dHout + y_grads[t-1]
-            else:
-                dh0[...] = dHin[:,input_size+1:]
-                
-        dX = dX.transpose((1,0,2))
-        return [dX], [dWLSTM], dch0
-        
+        wdelta = np.dot(Hin[t].T, dIFOG)
+        #print("wdelta:", wdelta.shape,"   dWLSTM:", dWLSTM.shape)
+        dWLSTM += wdelta
+        dHin = dIFOG.dot(self.WLSTM.T)
+    
+        # backprop the identity transforms into Hin
+        gx = dHin[:,1:input_size+1]
+        gHin = dHin[:,input_size+1:] 
+
+        #print("dS:", dS.shape,"   dHin:", dHin.shape)
+        return gx, [dWLSTM], np.array([dS, gHin])

@@ -1,7 +1,7 @@
 import numpy as np
 from cconv import convolve, pool, pool_back
 import math, time
-from .. import Layer
+from .layer import Layer
 from ..util import make_list
 from numpy.random import default_rng
 

@@ -1,4 +1,4 @@
-from .layer import Layer
+from .layers import Layer
 import numpy as np
 from .util import make_list
 
@@ -68,11 +68,19 @@ class SoftMaxActivation(Activation):
         return exp/(np.sum(exp, axis=-1, keepdims=True)), None, None
         
     def grads(self, y_grads, out_state_grads, xs, y, context):
-        n = y.shape[-1]
+        assert len(xs) == 1
+        x = xs[0]
+        x_shape = x.shape 
+        y_shape = y_grads.shape
+        assert x_shape == y_shape
+        n = y_shape[-1]
+        y_grads = y_grads.reshape((-1, n))
+        y = y.reshape((-1, n))
         eye = np.eye(n)[None,:,:]
         z = eye - y[:,:,None]
         jac = y[:,None,:]*z
         x_grads = np.einsum("mij,mi->mj", jac, y_grads)
+        x_grads = x_grads.reshape(x_shape)
         #print("SoftMaxActivation.grads: x:", xs[0], "  y_grads:", y_grads, "  x_grads:", x_grads)
         return [x_grads], None, None
     

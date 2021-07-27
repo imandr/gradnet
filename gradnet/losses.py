@@ -62,7 +62,7 @@ class CategoricalCrossEntropy(Loss):
         #print("CCE.values:", self.Values.shape, "  p:",p.shape, "  p_:", p_.shape)
         
         inp = self.Inputs[0]
-        if isinstance(inp.Layer, SoftMaxActivation):
+        if False and isinstance(inp.Layer, SoftMaxActivation):
             # if the input layer is SoftMax activation, bypass it and send simplified grads to its input
             #print("CategoricalCrossEntropy: sending simplified grads")
             self.Grads = p - p_
@@ -74,7 +74,7 @@ class CategoricalCrossEntropy(Loss):
         
     def backprop(self, weight=1.0):
         inp = self.Inputs[0]
-        if isinstance(inp.Layer, SoftMaxActivation):
+        if False and isinstance(inp.Layer, SoftMaxActivation):
             # if the input layer is SoftMax activation, bypass it and send simplified grads to its input
             inp.Inputs[0].backprop(self.Grads*weight)
         else:

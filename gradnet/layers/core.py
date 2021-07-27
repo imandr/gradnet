@@ -1,4 +1,4 @@
-from .. import Layer
+from .layer import Layer
 import numpy as np
 import math
 

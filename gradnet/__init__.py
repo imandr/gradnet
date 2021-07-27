@@ -1,5 +1,5 @@
 from .activations import ReLUActivation, LinearActivation, SoftMaxActivation, TanhActivation, get_activation, Activation
-from .graphs import Link, Input
+from .graphs import Link
 from .model import Model
-from .layer import Layer
+from .layers import Layer, Input
 from .losses import Loss
