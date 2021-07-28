@@ -1,3 +1,6 @@
+*.ipynb
+tmp/
+
 Untitled.ipynb
 
 # Byte-compiled / optimized / DLL files

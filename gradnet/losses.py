@@ -26,6 +26,7 @@ class Loss(object):
         assert isinstance(self.Grads, list) and len(self.Grads) == len(self.Inputs),\
             f"{self}: self.Grads:%s, len=%s" % (type(self.Grads), len(self.Grads))
         #print(f"{self}.backprop: self.Grads:", [g.shape if g is not None else "" for g in self.Grads])
+        #print(self, "inputs:", self.Inputs, "   grads:", self.Grads)
         for i, g in zip(self.Inputs, self.Grads):
             #print(self,".backprop: i,g:", i, g)
             if g is not None:
@@ -62,7 +63,7 @@ class CategoricalCrossEntropy(Loss):
         #print("CCE.values:", self.Values.shape, "  p:",p.shape, "  p_:", p_.shape)
         
         inp = self.Inputs[0]
-        if False and isinstance(inp.Layer, SoftMaxActivation):
+        if isinstance(inp.Layer, SoftMaxActivation):
             # if the input layer is SoftMax activation, bypass it and send simplified grads to its input
             #print("CategoricalCrossEntropy: sending simplified grads")
             self.Grads = p - p_
@@ -74,7 +75,7 @@ class CategoricalCrossEntropy(Loss):
         
     def backprop(self, weight=1.0):
         inp = self.Inputs[0]
-        if False and isinstance(inp.Layer, SoftMaxActivation):
+        if isinstance(inp.Layer, SoftMaxActivation):
             # if the input layer is SoftMax activation, bypass it and send simplified grads to its input
             inp.Inputs[0].backprop(self.Grads*weight)
         else:

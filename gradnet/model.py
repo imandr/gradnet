@@ -98,8 +98,10 @@ class Model(object):
         for name, (loss, weight) in self.Losses.items():
             values[name] = lv = loss.compute(d)
             #print(f"model.backprop: loss[{name}]:", lv)
+            #print("Model.backprop: loss:", name, loss.__class__.__name__, weight)
             if weight:
                 self.LossValues[name] = self.LossValues[name] + lv
+                #print("      backpropping...")
                 loss.backprop(weight)
         return values
             
