@@ -69,7 +69,7 @@ def train(model, g, length, batch_size, goal):
             #print(type(generated), generated.shape, generated)
             
             valid_length = g.validate(generated)
-            valid_ma += 0.1*(valid_length-valid_ma)
+            valid_ma += 0.01*(valid_length-valid_ma)
             if iteration % 100 == 0:
                 print(generated[:valid_length], "*", generated[valid_length:], " valid length:", valid_length)
                 print("Batches:", iteration, "  steps:", iteration*length*batch_size, "  loss/step:", losses["CCE"]/x.shape[1]/batch_size,
