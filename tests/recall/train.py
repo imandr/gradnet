@@ -51,17 +51,20 @@ def generate_batch(g, length, batch_size):
     return x, y_
     
     
-def train(model, g, length, batch_size):
+def train(model, g, length, batch_size, goal):
     valid_ma = 0.0    
     steps = 0
+    episodes = 0
     
     for iteration in range(100000):
         #print
         
         x, y_ = generate_batch(g, length, batch_size)
         losses, metrics = model.fit(x, y_)
+        steps += length*batch_size
+        episodes += batch_size
         
-        if iteration and iteration % 50 == 0:
+        if iteration and iteration % 10 == 0:
             generated = generate_from_model(model, g, length, batch_size)[0]
             #print(type(generated), generated.shape, generated)
             
@@ -71,6 +74,8 @@ def train(model, g, length, batch_size):
                 print(generated[:valid_length], "*", generated[valid_length:], " valid length:", valid_length)
                 print("Batches:", iteration, "  steps:", iteration*length*batch_size, "  loss/step:", losses["CCE"]/x.shape[1],
                    "  moving average:", valid_ma)
+        if valid_ma >= goal:
+            return episodes, steps, valid_ma
             
 if __name__ == '__main__':
     nwords = 10
@@ -80,4 +85,5 @@ if __name__ == '__main__':
     batch_size = 5
     g = Generator(nwords, distance, r)
     model = create_net(nwords)
-    train(model, g, length, batch_size)
+    episodes, steps, valid_ma = train(model, g, length, batch_size, length*0.95)
+    print("episodes=", episodes, "  steps=", steps, "   valid_length=", valid_ma)
