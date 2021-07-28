@@ -5,6 +5,43 @@ np.set_printoptions(precision=4, suppress=True, linewidth=132)
 
 from gradnet import Model
 from gradnet.layers import LSTM, LSTM_Z, Input, Dense
+from gradnet.losses import Loss
+
+class NormalizedCategoricalCrossEntropy(Loss):
+    
+    def compute(self, data):
+        from gradnet.activations import SoftMaxActivation
+        p_ = data["y_"]
+        inp = self.Inputs[0]
+        p = inp.Y
+        
+        #print("cce: p:", p)
+        pmax = np.max(p, axis=-1, keepdims=True)
+        self.Values = -np.sum(p_*np.log(np.clip(p/pmax, 1e-6, None)), axis=-1)             
+        #print("CCE.values:", self.Values.shape, "  p:",p.shape, "  p_:", p_.shape)
+        
+        inp = self.Inputs[0]
+        if isinstance(inp.Layer, SoftMaxActivation):
+            # if the input layer is SoftMax activation, bypass it and send simplified grads to its input
+            #print("CategoricalCrossEntropy: sending simplified grads")
+            self.Grads = p - p_
+        else:
+            self.Grads = -p_/np.clip(p, 1.0e-2, None)
+        #print("CCE.compute(): p:", p)
+        #print("              p_:", p_)
+        return self.value
+        
+    def backprop(self, weight=1.0):
+        from gradnet.activations import SoftMaxActivation
+        inp = self.Inputs[0]
+        if isinstance(inp.Layer, SoftMaxActivation):
+            # if the input layer is SoftMax activation, bypass it and send simplified grads to its input
+            inp.Inputs[0].backprop(self.Grads*weight)
+        else:
+            #print("CategoricalCrossEntropy: sending grads to:", inp, inp.Layer)
+            inp.backprop(self.Grads*weight)
+                
+
 
 def create_net(nwords, hidden=100):
     inp = Input((None, nwords))
@@ -12,7 +49,7 @@ def create_net(nwords, hidden=100):
     #r2 = LSTM(hidden, return_sequences=True)(r1)
     probs = Dense(nwords, activation="softmax")(r1)
     model = Model(inp, probs)
-    model.add_loss("cce", probs, name="CCE")
+    model.add_loss(NormalizedCategoricalCrossEntropy(probs), name="CCE")
     model.compile("adagrad", learning_rate=0.01)
     return model
     
@@ -50,6 +87,13 @@ def generate_batch(g, length, batch_size):
     
     return x, y_
     
+def test(model, g, length, batch_size):
+    #print(type(generated), generated.shape, generated)
+    
+    generated = generate_from_model(model, g, length, batch_size)
+    average_valid = np.mean([g.validate(s) for s in generated])
+    return average_valid, generated
+    
     
 def train(model, g, length, batch_size, goal):
     valid_ma = 0.0    
@@ -64,16 +108,15 @@ def train(model, g, length, batch_size, goal):
         steps += length*batch_size
         episodes += batch_size
         
-        if iteration and iteration % 10 == 0:
-            generated = generate_from_model(model, g, length, batch_size)[0]
-            #print(type(generated), generated.shape, generated)
-            
+        if iteration and iteration % 100 == 0:
+            average_valid, generated = test(model, g, length, batch_size)
+            valid_ma += 0.1*(average_valid-valid_ma)
+
+            generated = generated[0]
             valid_length = g.validate(generated)
-            valid_ma += 0.01*(valid_length-valid_ma)
-            if iteration % 100 == 0:
-                print(generated[:valid_length], "*", generated[valid_length:], " valid length:", valid_length)
-                print("Batches:", iteration, "  steps:", iteration*length*batch_size, "  loss/step:", losses["CCE"]/x.shape[1]/batch_size,
-                   "  moving average:", valid_ma)
+            print(generated[:valid_length], "*", generated[valid_length:], " valid length:", valid_length)
+            print("Batches:", iteration, "  steps:", iteration*length*batch_size, "  loss/step:", losses["CCE"]/x.shape[1]/batch_size,
+               "  moving average:", valid_ma)
         if valid_ma >= goal:
             return episodes, steps, valid_ma
             

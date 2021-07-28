@@ -29,7 +29,7 @@ class Generator(object):
             else:
                 r = random.random()
                 if t >= self.Distance and i == 0:
-                    i = sequence[t-self.Distance]
+                    i = (sequence[t-self.Distance]+self.NWords//2) % self.NWords
                 else:
                     j = sequence[t-1]
                     i = j
@@ -50,14 +50,14 @@ class Generator(object):
         for t, x in enumerate(sequence):
             if t > 0:
                 if sequence[t-1] == 0 and t >= self.Distance:
-                    if x != sequence[t-self.Distance]:
+                    if x != (sequence[t-self.Distance]+self.NWords//2) % self.NWords:
                         break
                 else:
                     d = x-sequence[t-1]
                     if d < 0:   d += self.NWords
                     d = d % self.NWords
                     d = min(d, self.NWords-d)
-                    if d <= self.Range or t >= self.Distance and x == sequence[t-self.Distance]:
+                    if d <= self.Range:
                         pass
                     else:
                         break
