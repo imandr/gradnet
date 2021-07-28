@@ -72,17 +72,23 @@ def train(model, g, length, batch_size, goal):
             valid_ma += 0.1*(valid_length-valid_ma)
             if iteration % 100 == 0:
                 print(generated[:valid_length], "*", generated[valid_length:], " valid length:", valid_length)
-                print("Batches:", iteration, "  steps:", iteration*length*batch_size, "  loss/step:", losses["CCE"]/x.shape[1],
+                print("Batches:", iteration, "  steps:", iteration*length*batch_size, "  loss/step:", losses["CCE"]/x.shape[1]/batch_size,
                    "  moving average:", valid_ma)
         if valid_ma >= goal:
             return episodes, steps, valid_ma
             
 if __name__ == '__main__':
-    nwords = 10
-    length = 50
-    distance = 5
-    r = 2
-    batch_size = 5
+    import getopt, sys
+    
+    opts, args = getopt.getopt(sys.argv[1:], "w:l:d:r:b:")
+    opts = dict(opts)
+    
+    nwords = int(opts.get("-w", 10))
+    length = int(opts.get("-l", 50))
+    r = int(opts.get("-r", 1))
+    distance = int(opts.get("-d", 5))
+    batch_size = int(opts.get("-b", 20))
+        
     g = Generator(nwords, distance, r)
     model = create_net(nwords)
     episodes, steps, valid_ma = train(model, g, length, batch_size, length*0.95)
