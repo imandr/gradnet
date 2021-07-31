@@ -5,9 +5,9 @@ np.set_printoptions(precision=4, suppress=True, linewidth=132)
 
 from gradnet import Model
 from gradnet.layers import LSTM, LSTM_Z, Input, Dense
-from gradnet.losses import Loss
+from gradnet.losses import LossBase
 
-class NormalizedCategoricalCrossEntropy(Loss):
+class NormalizedCategoricalCrossEntropy(LossBase):
     
     def compute(self, data):
         from gradnet.activations import SoftMaxActivation
@@ -55,7 +55,7 @@ def create_net(nwords, hidden=100):
     
 def generate_from_model(model, g, length, batch_size):
     #print("------- generate ----------")
-    model.reset_state()
+    model.reset_states()
     nwords = g.NWords
     
     rows = []
@@ -87,12 +87,15 @@ def generate_batch(g, length, batch_size):
     
     return x, y_
     
-def test(model, g, length, batch_size):
+def test(model, g, length, batch_size, samples):
     #print(type(generated), generated.shape, generated)
     
-    generated = generate_from_model(model, g, length, batch_size)
-    average_valid = np.mean([g.validate(s) for s in generated])
-    return average_valid, generated
+    sum_valid = nsamples = 0
+    while nsamples < samples:
+        generated = generate_from_model(model, g, length, batch_size)
+        sum_valid += np.sum([g.validate(s) for s in generated])
+        nsamples += len(generated)
+    return sum_valid/nsamples, generated[0]
     
     
 def train(model, g, length, batch_size, goal):
@@ -109,16 +112,15 @@ def train(model, g, length, batch_size, goal):
         episodes += batch_size
         
         if iteration and iteration % 100 == 0:
-            average_valid, generated = test(model, g, length, batch_size)
+            average_valid, generated = test(model, g, length, batch_size, 100)
             valid_ma += 0.1*(average_valid-valid_ma)
 
-            generated = generated[0]
             valid_length = g.validate(generated)
             print(generated[:valid_length], "*", generated[valid_length:], " valid length:", valid_length)
             print("Batches:", iteration, "  steps:", iteration*length*batch_size, "  loss/step:", losses["CCE"]/x.shape[1]/batch_size,
-               "  moving average:", valid_ma)
-        if valid_ma >= goal:
-            return episodes, steps, valid_ma
+               "  average valid length:", average_valid)
+            if average_valid >= goal:
+                return episodes, steps, valid_ma
             
 if __name__ == '__main__':
     import getopt, sys

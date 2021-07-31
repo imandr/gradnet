@@ -2,7 +2,7 @@ from gradnet import Input, Model
 from gradnet.layers import Dense
 from gradnet.activations import get_activation
 from gradnet.optimizers import get_optimizer
-from gradnet.losses import get_loss
+from gradnet.losses import Loss
 from gradnet.metrics import get_metric
 
 import numpy as np
@@ -39,17 +39,15 @@ np.set_printoptions(precision=4, suppress=True)
 sgd = get_optimizer("SGD", learning_rate=0.01, momentum=0.5)
 adam = get_optimizer("adam")
 #ad = get_optimizer("ad", learning_rate=0.1)
-mse = get_loss("mse")
 accuracy = get_metric("accuracy")
 
 def create_model():
-    cce = get_loss("cce")
     inp = Input((28*28,))
     dense1 = Dense(1024, name="dense1", activation="relu")(inp)
     probs = Dense(10, activation="softmax", name="top")(dense1)
     model = Model([inp], [probs])
     
-    model.add_loss(cce(probs), name="cce")
+    model.add_loss(Loss("cce", probs), name="cce")
     return model
 
 model = create_model()

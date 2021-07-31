@@ -1,27 +1,37 @@
 import numpy as np
 from .util import make_list
 from .activations import SoftMaxActivation
+from types import FunctionType
 
-class Loss(object):
+class LossBase(object):
     
-    def __init__(self, *inputs, name=None):
+    def __init__(self, *params, name=None, callable=None):
+        if name is None:
+            if callable is not None:
+                if hasattr(callable, "Name"):
+                    name = callable.Name
+                elif hasattr(callable, "__name__"):
+                    name = callable.__name__
+                elif hasattr(callable, "__class__"):
+                    name = callable.__class__.__name__
+            else:
+                name = self.__class__.__name__
+                
+        #print("LossBase create: name:", name)
+
         self.Name = name
-        if isinstance(inputs[0], list):
-            self.Inputs = inputs[0]
-        else:
-            self.Inputs = list(inputs)
+        self.Inputs = params
         self.Grads = None
         self.Values = None
-        self.Context = None
+        self.Callable = callable
         
     def __str__(self):
-        name = self.Name or self.__class__.__name__
+        if self.Name:   
+            name = self.Name
+        else:
+            name = self.__class__.__name__
         return f"[Loss {name}]"
         
-    @property
-    def value(self):
-        return np.sum(self.Values)
-
     def backprop(self, weight=1.0):
         assert isinstance(self.Grads, list) and len(self.Grads) == len(self.Inputs),\
             f"{self}: self.Grads:%s, len=%s" % (type(self.Grads), len(self.Grads))
@@ -31,59 +41,92 @@ class Loss(object):
             #print(self,".backprop: i,g:", i, g)
             if g is not None:
                 i.backprop(g*weight)
+                
+    @property
+    def value(self):
+        return np.sum(self.Values)
 
     def compute(self, data={}):
-        # data is a dictionary { "item name" -> ndarray }
-        raise NotImplementedError()
-        
-class MSE(Loss):
-    
-    def compute(self, data):
-        y_ = data["y_"]
-        diff = self.Inputs[0].Y - y_
-        if False:
-            print("MSE.compute: ")
-            print("   y:   ", self.Inputs[0].Y)
-            print("   y_:  ", y_)
-            print("   diff:", diff)
-        self.Values = np.sum(diff**2, axis=-1)          
-        self.Grads = [diff*2]         
-        #print("MSE: dL/dx:", self.Grads[0].shape, self.Grads) 
+        f = self if self.Callable is None else self.Callable
+        values, grads = f(data.get("y_"), *[i.Y for i in self.Inputs], data)
+        grads = make_list(grads)
+        if grads is None:
+            grads = [None]
+        self.Values, self.Grads = values, grads
         return self.value
         
-class CategoricalCrossEntropy(Loss):
+    @staticmethod
+    def from_function(f, *inputs, name=None):
+        if name is None:
+            if f is not None:
+                if hasattr(f, "Name"):
+                    name = callable.Name
+                elif hasattr(f, "__name__"):
+                    name = f.__name__
+                elif hasattr(f, "__class__"):
+                    name = f.__class__.__name__
+        return LossBase(*inputs, name=name, callable=f)
+        
+class CategoricalCrossEntropy(LossBase):
     
-    def compute(self, data):
-        p_ = data["y_"]
-        inp = self.Inputs[0]
-        p = inp.Y
+    def __call__(self, y_, y, data):
+        p_ = y_
+        p = y
         
         #print("cce: p:", p)
-        self.Values = -np.sum(p_*np.log(np.clip(p, 1e-6, None)), axis=-1)             
+        values = -np.sum(p_*np.log(np.clip(p, 1e-6, None)), axis=-1)             
         #print("CCE.values:", self.Values.shape, "  p:",p.shape, "  p_:", p_.shape)
         
         inp = self.Inputs[0]
         if isinstance(inp.Layer, SoftMaxActivation):
             # if the input layer is SoftMax activation, bypass it and send simplified grads to its input
             #print("CategoricalCrossEntropy: sending simplified grads")
-            self.Grads = p - p_
+            grads = p - p_
         else:
-            self.Grads = -p_/np.clip(p, 1.0e-2, None)
+            grads = -p_/np.clip(p, 1.0e-2, None)
         #print("CCE.compute(): p:", p)
         #print("              p_:", p_)
-        return self.value
+        return values, grads
         
     def backprop(self, weight=1.0):
         inp = self.Inputs[0]
         if isinstance(inp.Layer, SoftMaxActivation):
             # if the input layer is SoftMax activation, bypass it and send simplified grads to its input
-            inp.Inputs[0].backprop(self.Grads*weight)
+            inp.Inputs[0].backprop(self.Grads[0]*weight)
         else:
             #print("CategoricalCrossEntropy: sending grads to:", inp, inp.Layer)
-            inp.backprop(self.Grads*weight)
+            inp.backprop(self.Grads[0]*weight)
+            
+class LossStubForFunction(object):
+    
+    def __init__(self, f):
+        self.F = f
+        #print("stub: function.__name__:", f.__name__)
+        
+    def __call__(self, *inputs, **args):
+        #print("LossStubForFunction.__call__: inputs:", inputs)
+        return LossBase.from_function(self.F, *inputs, **args)
+        
+def mse(y_, y, data):
+        diff = y - y_
+        return np.sum(diff**2, axis=-1), diff*2
                 
-def get_loss(name):
-    return {
-        "mse":  MSE,
+loss_stubs = {
+        "mse":  LossStubForFunction(mse),
         "cce":  CategoricalCrossEntropy
-    }[name]
+}
+        
+def Loss(*params, **args):
+    if isinstance(params[0], str):
+        name = params[0]
+        if not name in loss_stubs:
+            raise ValueError(f"Loss {name} not found")
+        return loss_stubs[name](*params[1:], **args)
+    elif isinstance(params[0], FunctionType):
+        return LossBase.from_function(*params, **args)
+    else:
+        raise ValueError(f"Can not create Loss object for {params}")
+            
+def get_loss(name):
+    print("get_loss(name) is deprecated. Please use Loss(name)")
+    return Loss(name)

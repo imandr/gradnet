@@ -37,11 +37,12 @@ class Model(object):
         for out in self.Outputs:
             self.AllLayers += list(self._layers_rec(out, seen))
             
-    def add_loss(self, loss, *loss_args, weight=1.0, name=None):
+    def add_loss(self, loss, weight=1.0, name=None):
         name = name or "loss_%d" % (len(self.Losses),)
         if isinstance(loss, str):
             loss = get_loss(loss)(*loss_args)
         self.Losses[name] = (loss, weight)
+        return self
 
     def compile(self, optimizer=None, metrics=[], **optimizer_args):
         self.Metrics = metrics
@@ -90,6 +91,8 @@ class Model(object):
         self.Ys = [o.compute() for o in self.Outputs]
         return self.Ys
         
+    predict = compute       # alias
+        
     def backprop(self, y_=None, data={}):
         assert isinstance(data, dict)
         d = data.copy()
@@ -97,6 +100,9 @@ class Model(object):
         values = {}
         for name, (loss, weight) in self.Losses.items():
             values[name] = lv = loss.compute(d)
+            grads = loss.Grads
+            #print(loss, ": grads:", None if grads is None else [(g.shape, np.mean(g*g)) if g is not None else "-" for g in grads])
+            
             #print(f"model.backprop: loss[{name}]:", lv)
             #print("Model.backprop: loss:", name, loss.__class__.__name__, weight)
             if weight:
@@ -110,18 +116,15 @@ class Model(object):
         for o in self.Outputs:
             o.reset_gradients()
             
-    def reset_state(self):
+    def reset_states(self):
         #print("Model.reset_state()")
         for o in self.Outputs:
             o.reset_state()
             
+    reset_state = reset_states              # deprecated
+            
     def apply_deltas(self):
         
-        if False:
-            print("Model.apply_delats: grads from losses:")
-            for name, (l, w) in self.Losses.items():
-                print(name, " weight:", w, "   grads:", l.Grads)
-    
         out = []
         for layer in self.AllLayers:
             deltas = layer.apply_deltas()

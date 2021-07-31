@@ -30,7 +30,7 @@ class SGD(SingleParamOptimizer):
 
     # deals with single layer param
         
-    def __init__(self, learning_rate=0.001, momentum=0.0):
+    def __init__(self, learning_rate=0.01, momentum=0.0):
         self.Eta = learning_rate
         self.Momentum = momentum
         

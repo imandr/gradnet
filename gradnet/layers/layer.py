@@ -39,6 +39,8 @@ class Layer(object):
         self.NSamples = 0
         self.Configured = False
         self.Params = []
+        self.StateInGradients = self.XGradients = self.WeightsGradients = None     # saved for inofrmation purposes. Not used by the Layer itself
+
         if isinstance(activation, str):
             from ..activations import get_activation
             self.Activation = get_activation(activation)
@@ -125,14 +127,20 @@ class Layer(object):
             self.NSamples += nsamples
         #print(self, ".backprop: pgardsum:", self.PGradSum)
         #print(self, ".backprop: ygrads:", ygrads, " -> x_grads:", x_grads)
+        
+        self.XGradients = x_grads                   # saved for inofrmation purposes. Not used by the Layer itself
+        self.StateInGradients = s_in_grads          # saved for inofrmation purposes. Not used by the Layer itself
+        
         return x_grads, s_in_grads
                 
     def apply_deltas(self):
         deltas = None
+        self.WeightsGradients = None if self.PGradSum is None else [g.copy() for g in self.PGradSum]           # saved for inofrmation purposes. Not used by the Layer itself
         if self.PGradSum is not None and self.NSamples > 0:
             #grads = [g/self.NSamples for g in self.PGradSum]
             deltas = self.Optimizer.apply_deltas(self.PGradSum, self.params)
         self.reset_gradients()
+        self.Deltas = deltas
         return deltas
         
     def set_weights(self, weights):
@@ -146,7 +154,7 @@ class Layer(object):
         raise NotImplementedError()
 
     def get_weights(self):
-        return self.params
+        return [w.copy() for w in self.params]
 
     def configure(self, inputs):
         raise NotImplementedError()
@@ -175,7 +183,7 @@ class Layer(object):
                         include_state=True, include_value=True,
                         tolerance=0.001, 
                         relative_tolerance = 0.01, 
-                        delta = 1.0e-6):
+                        delta = 1.0e-7):
                         
         import numpy as np
         import random
