@@ -183,10 +183,16 @@ class Layer(object):
                         include_state=True, include_value=True,
                         tolerance=0.001, 
                         relative_tolerance = 0.01, 
-                        delta = 1.0e-7):
+                        delta = 1.0e-4):
                         
         import numpy as np
         import random
+        
+        def tolerated(g1, g2):
+            g12 = (g1+g2)/2
+            return abs(g1-g2) < tolerance or \
+                g12 != 0 and abs(g1-g2)/g12 < relative_tolerance
+            
         
         def loss_y_and_s(y, s):
             if s is None:
@@ -289,9 +295,7 @@ class Layer(object):
             grad_i = x_grads[i]
             dldx_l = grad_i[inx]
 
-            if abs(dldx_l-dldx) > tolerance or (
-                    dldx_l != 0 and abs((dldx_l-dldx)/dldx) > relative_tolerance
-                ):
+            if not tolerated(dldx_l,dldx):
                 print(f"==== Detected difference in dL/dx[{i}][{inx}]: computed:{dldx_l}, numericaly calculated:{dldx}")
                 x_errors += 1
         #
@@ -319,9 +323,7 @@ class Layer(object):
             #print("check_grads: i=",i,"   grad_i=", grad_i.shape, "   inx=", inx)
             dldw_l = grad_i[inx]
             
-            if abs(dldw_l-dldw) > tolerance or (
-                    dldw_l != 0 and abs((dldw_l-dldw)/dldw) > relative_tolerance
-                ):
+            if not tolerated(dldw_l, dldw):
                 print(f"==== Detected difference in dL/dw[{i}][{inx}]: computed:{dldw_l}, numericaly calculated:{dldw}")
                 w_errors += 1
         #
@@ -351,9 +353,7 @@ class Layer(object):
                 # compare to the gradients returned by the layer
                 dlds_l = s_in_grads[i][inx]
 
-                if abs(dlds_l-dlds) > tolerance or (
-                        dlds_l != 0 and abs((dlds_l-dlds)/dlds) > relative_tolerance
-                    ):
+                if not tolerated(dlds_l, dlds):
                     print(f"==== Detected difference in dL/ds[{i}][{inx}]: computed:{dlds_l}, numericaly calculated:{dlds}")
                     s_errors += 1
         return (x_errors, w_errors, s_errors)

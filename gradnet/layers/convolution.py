@@ -61,6 +61,8 @@ class Conv2D(Layer):
 
     def compute(self, xs, in_state):
         y = convolve_xw(xs[0], self.W, 'valid') + self.b
+        #print("compute: x:", xs[0], "   W:", self.W, "   -> y:", y)
+        
         return y, None, None
 
     def grads(self, gY, _, xs, y, context):
@@ -72,6 +74,9 @@ class Conv2D(Layer):
         #print x.shape, gY.shape
 
         gW = convolve_xy(x, gY)
+        
+        #print("grads: x:", x, "   gY:", gY, "   -> gW:", gW)
+        
         gb = np.sum(gY, axis=(0, 1, 2))
 
         w_flip = self.W[::-1,::-1,:,:]
