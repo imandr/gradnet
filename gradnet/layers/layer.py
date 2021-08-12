@@ -301,31 +301,32 @@ class Layer(object):
         #
         # Weights gradients
         #
-        for t in range(attempts):
-            w1s = [w.copy() for w in w0s]
-            i = random.randint(0, len(w1s)-1)
-            wi = w1s[i]
-            wif = wi.reshape((-1,))
-            n = wif.shape[-1]
-            j = random.randint(0, n-1)
-            inx = np.unravel_index(j, wi.shape)
-            wif[j] += delta
+        if w_grads:
+            for t in range(attempts):
+                w1s = [w.copy() for w in w0s]
+                i = random.randint(0, len(w1s)-1)
+                wi = w1s[i]
+                wif = wi.reshape((-1,))
+                n = wif.shape[-1]
+                j = random.randint(0, n-1)
+                inx = np.unravel_index(j, wi.shape)
+                wif[j] += delta
 
-            self.set_weights(w1s)
-            y1, s_out, _ = self.compute(x0s, s_in_0)
-            l1, _, _ = loss(y1, s_out)
-            self.set_weights(w0s)
+                self.set_weights(w1s)
+                y1, s_out, _ = self.compute(x0s, s_in_0)
+                l1, _, _ = loss(y1, s_out)
+                self.set_weights(w0s)
 
-            dldw = (l1-l0)/delta
+                dldw = (l1-l0)/delta
 
-            # compare to the gradients returned by the layer
-            grad_i = w_grads[i]
-            #print("check_grads: i=",i,"   grad_i=", grad_i.shape, "   inx=", inx)
-            dldw_l = grad_i[inx]
+                # compare to the gradients returned by the layer
+                grad_i = w_grads[i]
+                #print("check_grads: i=",i,"   grad_i=", grad_i.shape, "   inx=", inx)
+                dldw_l = grad_i[inx]
             
-            if not tolerated(dldw_l, dldw):
-                print(f"==== Detected difference in dL/dw[{i}][{inx}]: computed:{dldw_l}, numericaly calculated:{dldw}")
-                w_errors += 1
+                if not tolerated(dldw_l, dldw):
+                    print(f"==== Detected difference in dL/dw[{i}][{inx}]: computed:{dldw_l}, numericaly calculated:{dldw}")
+                    w_errors += 1
         #
         # Input state gradients
         #

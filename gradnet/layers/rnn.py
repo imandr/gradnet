@@ -36,7 +36,7 @@ class RNNLayer(Layer):
         xs = make_list(xs)
         assert len(xs) == 1
         x = xs[0]
-        assert len(x.shape) == 3       # at [mb, t, w]
+        assert len(x.shape) == 3, f"Invalid input shape for RNN: {x.shape}. Expected 3 dimensions"       # at [mb, t, w]
         x = x.transpose((1,0,2))
         n, mb, xw = x.shape
         assert n > 0
