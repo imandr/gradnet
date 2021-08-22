@@ -4,7 +4,7 @@ import numpy as np, random
 np.set_printoptions(precision=4, suppress=True, linewidth=132)
 
 from gradnet import Model
-from gradnet.layers import LSTM, LSTM_Z, Input, Dense
+from gradnet.layers import LSTM, LSTM_Z, Input, Dense, Memory
 from gradnet.losses import LossBase
 
 class NormalizedCategoricalCrossEntropy(LossBase):
@@ -48,6 +48,22 @@ def create_net(nwords, hidden=100):
     r1 = LSTM(hidden, return_sequences=True)(inp)
     #r2 = LSTM(hidden, return_sequences=True)(r1)
     probs = Dense(nwords, activation="softmax")(r1)
+    model = Model(inp, probs)
+    model.add_loss(NormalizedCategoricalCrossEntropy(probs), name="CCE")
+    model.compile("adagrad", learning_rate=0.01)
+    return model
+    
+def create_net(nwords, hidden=100):
+    C = 20
+    L = 5
+    inp = Input((None, nwords))
+    
+    d1 = Dense(hidden, activation="relu")(inp)
+    d2 = Dense(L*3+2, activation="tanh")(d1)
+    
+    m = Memory(C,L,return_sequences=True)(d2)
+    
+    probs = Dense(nwords, activation="softmax")(m)
     model = Model(inp, probs)
     model.add_loss(NormalizedCategoricalCrossEntropy(probs), name="CCE")
     model.compile("adagrad", learning_rate=0.01)
