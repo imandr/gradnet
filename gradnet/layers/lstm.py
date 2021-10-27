@@ -53,10 +53,12 @@ def _forward(t, w, xt, s, context):
 
 def _backward(t, w, gy_t, gstate_t, gw, context):
     
+    
     b,d = gy_t.shape
     dc_out, dh_out = gstate_t
 
     dWLSTM = gw[0]
+    #print("LSTM._backward: w:", np.mean(w*w), "   dW:", np.mean(dWLSTM**2), "   gstate:", np.mean(gstate_t**2),"   gy:", np.mean(gy_t**2))
     
     #print("context:", context)
 

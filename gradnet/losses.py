@@ -48,6 +48,7 @@ class LossBase(object):
 
     def compute(self, data={}):
         f = self if self.Callable is None else self.Callable
+        #print(f"Loss {self.Name}: calling f with:", *[i.Y for i in self.Inputs], " and data{%s}" % (list(data.keys()),))
         values, grads = f(data.get("y_"), *[i.Y for i in self.Inputs], data)
         grads = make_list(grads)
         if grads is None:
@@ -108,11 +109,16 @@ class LossStubForFunction(object):
         return LossBase.from_function(self.F, *inputs, **args)
         
 def mse(y_, y, data):
-        diff = y - y_
-        return np.sum(diff**2, axis=-1), diff*2
+    diff = y - y_
+    return np.sum(diff**2, axis=-1), diff*2
+        
+def zero(y_, y, data):
+    z = np.zeros_like(y)
+    return z, None
                 
 loss_stubs = {
         "mse":  LossStubForFunction(mse),
+        "zero": LossStubForFunction(zero),
         "cce":  CategoricalCrossEntropy
 }
         
