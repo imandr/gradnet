@@ -43,7 +43,7 @@ class Model(object):
             loss = get_loss(loss)(*loss_args)
         self.Losses[name] = (loss, weight)
         return self
-
+        
     def compile(self, optimizer=None, metrics=[], **optimizer_args):
         self.Metrics = metrics
         if optimizer is not None:
