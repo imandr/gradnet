@@ -31,8 +31,30 @@ class Input(Link):
     def reset_gradsients(self):
         self.XGradSum = None
         
+class Constant(Link):
+    def __init__(self, value=None, name=None):
+        self.Values = np.ones((1,)) if value is None else value
+        self.Inputs = []
+        self.Layer = None
+        self.Name = name
+        
+    def __str__(self):
+        name = self.Name or "(unnamed)"
+        return f"[Constant {name} {self.Value}]"
+        
+    def compute(self):
+        return self.Value
+        
+    def backprop(self, grads):
+        pass
+        
+    def reset_gradsients(self):
+        pass
+        
 class Layer(object):
     
+    params = []
+
     def __init__(self, name=None, activation=None):
         self.Name = name
         self.PGradSum = None
@@ -83,6 +105,7 @@ class Layer(object):
         self.Optimizer = LayerOptimizer(self.params, param_optimizer)
         
     def reset_gradients(self):
+        #print("Layer.reset_gradients:", self)
         self.PGradSum = None
         self.NSamples = 0
     
@@ -152,10 +175,10 @@ class Layer(object):
     
     def _set_weights(self, weights):
         raise NotImplementedError()
-
+        
     def get_weights(self):
         return [w.copy() for w in self.params]
-
+        
     def configure(self, inputs):
         raise NotImplementedError()
         pass

@@ -100,8 +100,11 @@ py_convolve(PyObject *dummy, PyObject *args)
     {
         /* mode is "valid" */
         for(i=0; i<zshape[0]; i++)
+		{
             for(j=0; j<zshape[1]; j++)
+			{
                 for(yz=0; yz<zshape[2]; yz++)
+				{
                     for(xz=0; xz<zshape[3]; xz++)
                     {
                         double val = 0;
@@ -132,6 +135,9 @@ py_convolve(PyObject *dummy, PyObject *args)
                         }
                         *(double*)PyArray_GETPTR4(z, i, j, yz, xz) = val;
                     }
+				}
+			}
+		}
     }   
     else
     {

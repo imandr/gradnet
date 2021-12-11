@@ -56,7 +56,7 @@ class Dense(Layer):
     def grads(self, y_grads, s_out_grads, xs, y, context):
         #print(self, ".grads: y_grads:", y_grads)
         assert isinstance(xs, list) and len(xs) == 1, "%s.grads(): invalid type of xs: %s %s" % (self, type(xs), xs)
-        assert y_grads.shape[-1] == self.NOut
+        assert y_grads.shape[-1] == self.NOut, f"{self}: Invalid shape for Y gradients: {y_grads.shape}. Expected last dim to be {self.NOut}"
         x = xs[0]
         m = len(y_grads)        # batch size
         inp_flat = x.reshape((-1, self.NIn))
@@ -72,7 +72,7 @@ class Dense(Layer):
     @property
     def params(self):
         return self.W, self.B
-        
+                
 class Flatten(Layer):
     
     params = []

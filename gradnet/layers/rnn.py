@@ -89,6 +89,8 @@ class RNNLayer(Layer):
             x_grads[t,:,:] = gxt
             gc = gs
         
+        #print("RNNLayer.grads: Y grads:", np.mean(y_grads**2), "   W grads:", [np.mean(g**2) for g in gw])
+        
         return [x_grads.transpose((1,0,2))], gw, gc
         
 

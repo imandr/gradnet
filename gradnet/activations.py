@@ -32,7 +32,17 @@ class LinearActivation(Activation):
     def grads(self, y_grads, out_state_grads, xs, y, context):
         return [y_grads], None, None
     
-
+class SoftplusActivation(Activation):
+    
+    def compute(self, xs, in_state=None):
+        xs = make_list(xs)
+        assert len(xs) == 1
+        x = xs[0]
+        return np.log(1+np.exp(x)), None, None
+        
+    def grads(self, y_grads, out_state_grads, xs, y, context):
+        return [y_grads/(1.0+np.exp(-y))], None, None
+    
 class TanhActivation(Activation):
     
     def compute(self, xs, in_state=None):
@@ -89,6 +99,7 @@ def get_activation(kind, *params, **args):
         "linear":   LinearActivation,
         "tanh":     TanhActivation,
         "softmax":  SoftMaxActivation,
-        "relu":     ReLUActivation
+        "relu":     ReLUActivation,
+        "softplus": SoftplusActivation
     }[kind]
     return a(*params, **args)

@@ -70,9 +70,11 @@ class Link(object):
             self.Y, self.OutState, self.Context = self.Layer.compute(self.Xs, self.InState)
         return self.Y
 
-    def backprop(self, y_grads):
+    def backprop(self, y_grads, state_grads=None):
         #assert isinstance(y_grads, np.ndarray) and y_grads.shape[1:] == self.Shape
-        xgrads, self.StateGrads = self.Layer.backprop(y_grads, self.StateGrads, self.Xs, self.Y, self.Context)
+        xgrads, self.StateGrads = self.Layer.backprop(y_grads, state_grads, self.Xs, self.Y, self.Context)
+        if xgrads is None:
+            return
         assert isinstance(xgrads, list) and len(xgrads) == len(self.Inputs)
         #print(f"    x_grads from layer {self.Layer}:", [g.shape if g is not None else "" for g in xgrads])
         for xg, i in zip(xgrads, self.Inputs):

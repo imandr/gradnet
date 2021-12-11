@@ -64,6 +64,36 @@ class Model(object):
     def layers(self):
         return self.AllLayers
         
+    def get_weights(self):
+        lst = []
+        for l in self.layers:
+            n = len(l.params)
+            if n:
+                lst += list(l.get_weights())
+        return lst
+        
+    def set_weights(self, weights):
+        for l in self.layers:
+            n = len(l.params)
+            if n:
+                l.set_weights(weights[:n])
+                weights = weights[n:]
+                
+    def update_weights(self, source, alpha):
+        if isinstance(source, Model):
+            assert len(self.layers) == len(source.layers), "Source and destination models have different number of layers"
+            source = source.get_weights()
+        else:
+            assert isinstance(source, list)
+        i = 0
+        for l in self.layers:
+            n = len(l.params)
+            if n:
+                for w, w1 in zip(l.params, source[i:i+n]):
+                    w += alpha*(w1-w)
+                i += n
+        assert i == len(source), "Not all source weights were used in update_weights()"
+        
     def __setitem__(self, name, v):
         self.Map[name] = v
         
@@ -124,7 +154,6 @@ class Model(object):
     reset_state = reset_states              # deprecated
             
     def apply_deltas(self):
-        
         out = []
         for layer in self.AllLayers:
             deltas = layer.apply_deltas()
