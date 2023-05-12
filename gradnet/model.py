@@ -111,12 +111,26 @@ class Model(object):
     # apply_deltas()
         
     def compute(self, inputs):
-        #print("------------------- Model.call() ---------------------")
+        """Computes the values of the network given the inputs
+        
+        inputs:
+            ndarray: converted to [ndarray]
+            (ndarray, ndarray, ...): converted to [ndarray, ndarray, ...]
+            Each ndarray must have additional, first minibatch dimension
+        
+        returns:
+            [ndarray, ...]
+        """
+        
+        
+        #print("------------------- Model.compute() ---------------------")
         inputs = make_list(inputs)
         assert len(inputs) == len(self.Inputs)
+        assert all(x.shape[1:] == inp.Shape for (x, inp) in zip(inputs, self.Inputs))
         for o in self.Outputs:
             o.reset()
         for i, x in zip(self.Inputs, inputs):
+            #print("Model.compute(): setting input to:", x)
             i.set(x)
         self.Ys = [o.compute() for o in self.Outputs]
         return self.Ys
@@ -129,6 +143,7 @@ class Model(object):
         d["y_"] = y_
         values = {}
         for name, (loss, weight) in self.Losses.items():
+            #print("Model.backprop: computing loss", name)
             values[name] = lv = loss.compute(d)
             grads = loss.Grads
             #print(loss, ": grads:", None if grads is None else [(g.shape, np.mean(g*g)) if g is not None else "-" for g in grads])

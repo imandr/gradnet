@@ -1,6 +1,11 @@
 def make_list(x):
     if x is None:   return None
-    return x if isinstance(x, list) else [x]
+    if isinstance(x, tuple):
+        return [*x]
+    elif not isinstance(x, list):
+        return [x]
+    else:
+        return x
 
 class Callback(object):
     
