@@ -90,7 +90,7 @@ class Model(object):
                     for w, w1 in zip(l.params, source[i:i+n]):
                         w += alpha*(w1-w)
                 else:
-                    l.set_weights(source[i:i+n])
+                    l.set_weights(source[i:i+n].copy())
                 i += n
         assert i == len(source), "Not all source weights were used in update_weights()"
         return saved
