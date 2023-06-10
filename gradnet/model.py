@@ -63,7 +63,7 @@ class Model(object):
     @property
     def layers(self):
         return self.AllLayers
-        
+
     def get_weights(self):
         lst = []
         for l in self.layers:
@@ -71,29 +71,39 @@ class Model(object):
             if n:
                 lst += list(l.get_weights())
         return lst
-        
-    def set_weights(self, weights):
-        for l in self.layers:
-            n = len(l.params)
-            if n:
-                l.set_weights(weights[:n])
-                weights = weights[n:]
-                
-    def update_weights(self, source, alpha):
+
+    def set_weights(self, source):
+        self.update_weights(source, 1.0)
+
+    def update_weights(self, source, alpha=1.0):
         if isinstance(source, Model):
             assert len(self.layers) == len(source.layers), "Source and destination models have different number of layers"
             source = source.get_weights()
         else:
             assert isinstance(source, list)
         i = 0
+        saved = self.get_weights()
         for l in self.layers:
             n = len(l.params)
             if n:
-                for w, w1 in zip(l.params, source[i:i+n]):
-                    w += alpha*(w1-w)
+                if alpha != 1.0:
+                    for w, w1 in zip(l.params, source[i:i+n]):
+                        w += alpha*(w1-w)
+                else:
+                    l.set_weights(source[i:i+n])
                 i += n
         assert i == len(source), "Not all source weights were used in update_weights()"
+        return saved
         
+    def save_weights(self, filename):
+        weights = self.get_weights()
+        if weights:
+            np.savez(filename, *weights)
+            
+    def load_weights(self, filename):
+        loaded = np.load(filename)
+        self.set_weights([loaded[k] for k in loaded])
+
     def __setitem__(self, name, v):
         self.Map[name] = v
         
