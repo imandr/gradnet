@@ -51,16 +51,17 @@ def deserialize_array(data):
     if size is not None:
         #print("    data:", len(data))
         tail = data[size:]
-        out = data[:size].tobytes()
+        out = data[:size]
         #print("    tail:", len(tail))
     else:
         tail = b''
     if dtype != "bytes":
-        out = np.frombuffer(out, dtype).reshape(shape)
+        out = np.frombuffer(out, dtype).reshape(shape).copy()
+        #print("deserialize_array: out:", out, out.data)
     return out, tail
 	
 def serialize_weights(params):
-    return b''.join([serialize_array(p) for p in params])
+    return b''.join([serialize_array(p) for p in params or []])
 
 def deserialize_weights(inp_bytes):
     if not inp_bytes:
