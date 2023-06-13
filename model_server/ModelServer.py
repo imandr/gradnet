@@ -18,7 +18,7 @@ def to_str(s):
 class Model(Primitive):
     
     IdleTime = 30*60
-    Alpha = 0.1                 # default alpha
+    Alpha = 0.5                 # default alpha
     Beta = 0.5                  # max alpha
 
     def __init__(self, name, save_dir, target_reward=10.0, params=None):
@@ -49,9 +49,9 @@ class Model(Primitive):
         
     @synchronized
     def set(self, params, reward=None):
-        self.LastActivity = time.time()
         self.Params = params
         self.Reward = reward
+        self.LastActivity = time.time()
         self.save()
 
     @synchronized
@@ -77,7 +77,6 @@ class Model(Primitive):
             alpha = self.alpha(reward)
         if isinstance(params, bytes):
             params = deserialize_weights(params)
-        self.LastActivity = time.time()
         old_params = self.get()
         #print("Model.get: old_params:", old_params)
         if old_params is None:
@@ -86,6 +85,8 @@ class Model(Primitive):
             self.Params = [old + alpha * (new - old) for old, new in zip(old_params, params)]
         if reward is not None:
             self.Reward = reward if self.Reward is None else self.Reward + alpha * (reward - self.Reward)
+        self.LastActivity = time.time()
+        self.save()
         return self.Params
     
     @synchronized
