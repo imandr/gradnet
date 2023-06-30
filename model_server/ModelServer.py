@@ -25,7 +25,7 @@ class Model(Primitive):
         Primitive.__init__(self)
         self.Name = name
         self.Params = None
-        self.ParamsFile = save_dir + "/" + name + "_params.npz"
+        self.SaveFile = save_dir + "/" + name + "_params.npz"
         self.LastActivity = 0
         self.TargetReward = target_reward
         self.Reward = None
@@ -42,7 +42,7 @@ class Model(Primitive):
 
     @synchronized
     def get(self):
-        if self.Params is None and os.path.isfile(self.ParamsFile):
+        if self.Params is None and os.path.isfile(self.SaveFile):
             self.load()
         self.LastActivity = time.time()
         return self.Params
@@ -57,11 +57,11 @@ class Model(Primitive):
     @synchronized
     def save(self):
         if self.Params is not None:
-            np.savez(self.ParamsFile, *self.Params, reward=[self.Reward])
+            np.savez(self.SaveFile, *self.Params, reward=[self.Reward])
             
     @synchronized
     def load(self):
-        loaded = np.load(self.SaveFile)
+        loaded = np.load(self.SaveFile, allow_pickle=True)
         weights = []
         self.Reward = None
         for k in loaded:
@@ -100,7 +100,7 @@ class Model(Primitive):
     @synchronized
     def offload_if_idle(self):
         if time.time() > self.LastActivity + self.IdleTime and self.Params is not None:
-            np.savez(self.ParamsFile, *self.Params)
+            np.savez(self.SaveFile, *self.Params)
             self.Params = None
             
 class Handler(WPHandler):
@@ -156,7 +156,7 @@ class App(WPApp):
     @synchronized
     def model(self, name, create=True):
         model = self.Models.get(name)
-        if model is None and create:
+        if model is None:
             model = self.Models[name] = Model(name, self.SaveDir, self.Alpha)
         return model
         
