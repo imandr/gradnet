@@ -18,27 +18,37 @@ def to_str(s):
 class Model(Primitive):
     
     IdleTime = 30*60
-    Alpha = 0.5                 # default alpha
-    Beta = 0.5                  # max alpha
+    DefaultAlpha = 0.01                # used to calculate moving averages
+    DefaultBeta = 0.1                  # default weight update constant 
 
-    def __init__(self, name, save_dir, target_reward=10.0, params=None):
+    def __init__(self, name, save_dir, weights=None, alpha=None):
         Primitive.__init__(self)
         self.Name = name
-        self.Params = None
-        self.ParamsFile = save_dir + "/" + name + "_params.npz"
+        self.Weights = None
+        self.WeightsFile = save_dir + "/" + name + "_params.npz"
         self.LastActivity = 0
         self.TargetReward = target_reward
         self.Reward = None
+        
+        self.Alpha = alpha or self.DefaultAlpha
+        self.RewardMA = self.RewardSqMA = None
 
-    def alpha(self, reward = None):
-        if self.Reward is None:
-            return self.Alpha
-        r = (reward - self.Reward)/(abs(self.Reward - self.TargetReward) + 0.001)
-        if r < -0:
-            exp = math.exp(r)
-            return exp/(exp + 1) * self.Beta
+    def beta(self, reward = None):
+        if reward is None:
+            return self.DefaultBeta
+        if self.RewardMA is None:
+            self.RewardMA = reward
+            self.RewardSqMQ = reward**2
+            return self.DefaultBeta
+        sigma = math.sqrt(self.RewardSqMQ - self.RewardMA**2)
+        r = (reward - self.RewardMA)/sigma
+        if delta < 0:
+            beta = math.exp(r)/(1.0 + math.exp(r))
         else:
-            return 1/(1+math.exp(-r)) * self.Beta
+            beta = 1.0/(1.0 + math.exp(-r))
+        self.RewardMA += self.Alpha*(reward - self.RewardMA)
+        self.RewardSqMA += self.Alpha*(reward**2 - self.RewardSqMA)
+        return beta
 
     @synchronized
     def get(self):
