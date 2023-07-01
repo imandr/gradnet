@@ -1,4 +1,4 @@
-import time, os.path, numpy as np, io, traceback, sys, requests
+import time, os.path, numpy as np, io, traceback, sys, requests, json
 from .serialization import serialize_weights, deserialize_weights
 
 def to_bytes(s):
@@ -19,7 +19,7 @@ class ModelClient(object):
         self.URLHead = url_head
         self.ModelName = model_name
         
-    def get(self):
+    def get_weights(self):
         response = requests.get(self.URLHead + "/model/" + self.ModelName)
         if response.status_code == 404:
             return None
@@ -28,9 +28,16 @@ class ModelClient(object):
             print(response.text)
             response.raise_for_status()
         return deserialize_weights(response.content) if response.content else None
+        
+    def get_reward(self):
+        response = requests.get(self.URLHead + "/model/" + self.ModelName + "?reward=yes")
+        return json.loads(response.text)
     
-    def update(self, params):
-        response = requests.put(self.URLHead + "/model/" + self.ModelName, data=serialize_weights(params))
+    def update_weights(self, params, reward=None):
+        url = self.URLHead + "/model/" + self.ModelName
+        if reward is not None:
+            url += f"?reward={reward}"
+        response = requests.patch(url, data=serialize_weights(params))
         if response.status_code // 100 != 2:
             print(response)
             print(response.text)

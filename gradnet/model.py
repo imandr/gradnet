@@ -2,6 +2,7 @@ from .util import make_list
 import numpy as np
 from .optimizers import get_optimizer
 from .losses import get_loss
+import random
 
 class GradientAccumulator(object):
     
@@ -203,7 +204,7 @@ class Model(object):
             loss_values = acc.accumulate(x, y_, data)
         return loss_values, self.metrics(y_, metrics)
             
-    def fit(self, x, y_=None, data={}, batch_size=None, metrics=[], callbacks=[]):
+    def fit(self, x, y_=None, data={}, batch_size=None, metrics=[], callbacks=[], shuffle=False):
         # will always reset state for each batch !
         # y_ is a single ndarray, not a list
         x = make_list(x)
@@ -213,6 +214,19 @@ class Model(object):
         assert all(len(xi) == n for xi in x)
         assert y_ is None or len(y_) == n
         assert all(len(d) == n for d in data.values())
+
+        print("before shuffle: x:", *tuple(xi.shape for xi in x))
+
+        if shuffle:
+            inx = np.arange(n)
+            random.shuffle(inx)
+            print("inx:", inx.shape, inx[:10])
+            if y_ is not None:
+                y_ = y_[inx]
+            x = [xi[inx] for xi in x]
+            data = {k:d[inx] for k, d in data.items()}
+
+        print("after shuffle: x:", *tuple(xi.shape for xi in x))
 
         if batch_size is None:  batch_size = n
         samples = 0

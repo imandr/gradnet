@@ -17,6 +17,18 @@ class Callback(object):
         if nsamples >= self.NextPrint:
             print("nsamples:", nsamples, "   cce loss:", loss_values["cce"], "   accuracy:", metrics[0])
             self.NextPrint += self.PrintEvery
+
+class Callback(object):
+    
+    def __init__(self, print_every=5000, alpha=0.1):
+        self.RunningLoss = self.RunningAccuracy = None
+        self.NextPrint = self.PrintEvery = print_every
+        
+    def train_batch_end(self, nsamples, loss_values, metrics):
+        if nsamples >= self.NextPrint:
+            print("nsamples:", nsamples, "   cce loss:", loss_values["cce"], "   accuracy:", metrics[0])
+            self.NextPrint += self.PrintEvery
+
     
 from tensorflow.keras.datasets import mnist
 
