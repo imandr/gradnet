@@ -117,6 +117,10 @@ class LSTM(RNNLayer):
         self.Nout = self.NC = out_size
         self.ReturnSequences = return_sequences
         self.Nin = None
+        self.Params = {
+            "nout": out_size,
+            "sequences": return_sequences
+        }
         
     def configure(self, inputs):
         assert len(inputs) == 1

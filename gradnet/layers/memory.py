@@ -161,7 +161,12 @@ class Memory(RNNLayer):
         self.C = capacity
         self.D = 5.0
         self.ReturnSequences = return_sequences
-        
+        self.Params = {
+            "capacity": capacity,
+            "data_length": data_length,
+            "sequences": return_sequences
+        }
+    
     def configure(self, inputs):
         assert len(inputs) == 1 and inputs[0].Shape[-1] == self.L*3+2
         return (inputs[0].Shape[0], self.L) if self.ReturnSequences else (self.L,)

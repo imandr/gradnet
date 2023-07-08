@@ -30,14 +30,34 @@ class Input(Node):
         
     def reset_gradsients(self):
         self.XGradSum = None
-        
+
+    def as_jsonable(self):
+        return {
+            "class": "Input",
+            "name": self.Name,
+            "params":   {
+                "shape":    self.Shape
+            }
+        }
+
 class Constant(Node):
     def __init__(self, value=None, name=None):
         self.Values = np.ones((1,)) if value is None else value
         self.Inputs = []
         self.Layer = None
         self.Name = name
-        
+
+    def as_jsonable(self):
+        return {
+            "class": "Constant",
+            "name": self.Name,
+            "params":   {
+                "shape":    self.Values.shape,
+                "dtype":    self.Values.dtype,
+                "values":   list(self.Values.flat)
+            }
+        }
+
     def __str__(self):
         name = self.Name or "(unnamed)"
         return f"[Constant {name} {self.Value}]"

@@ -14,6 +14,11 @@ class GRU(Layer):
         self.ReturnSequences = return_sequences
         self.Nin = None
         self.Reversed = reversed
+        self.Params = {
+            "nout": out_size,
+            "reversed": reversed,
+            "sequences": return_sequences
+        }
         
     def configure(self, inputs):
         assert len(inputs) == 1

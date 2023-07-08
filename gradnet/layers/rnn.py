@@ -104,6 +104,11 @@ class RNN(RNNLayer):
         self.NC = recurrent_size or out_size
         self.ReturnSequences = return_sequences
         self.Nin = None
+        self.Params = {
+            "nout": self.out_size,
+            "nc": self.NC,
+            "sequences": return_sequences
+        }
         
     def configure(self, inputs):
         assert len(inputs) == 1

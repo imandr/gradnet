@@ -9,7 +9,7 @@ class Dense(Layer):
         self.NOut = n
         self.NIn = None
         self.B = self.W = None
-        self.Params = {"NOut": n}
+        self.Params = {"nout": n}
         
     def __str__(self):
         name = self.Name or "(unnamed)"
@@ -104,7 +104,7 @@ class Transpose(Layer):
         for i, m in enumerate(map):
             rev[m] = i
         self.Reversed = tuple(rev)
-        self.Params = {"Map": self.Map}
+        self.Params = {"map": self.Map}
     
     def configure(self, inputs):
         assert len(inputs) == 1
@@ -127,7 +127,7 @@ class Concatenate(Layer):
     def __init__(self, axis = -1, name=None):
         Layer.__init__(self, name=name)
         self.Axis = axis
-        self.Params = {"Axis": axis}
+        self.Params = {"axis": axis}
 
     def configure(self, inputs):
         assert len(inputs) >= 2

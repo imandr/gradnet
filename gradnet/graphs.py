@@ -45,6 +45,9 @@ class Node(object):
 
     def __hash__(self):
         return hash(id(self))
+        
+    def as_jsonable(self):
+        return self.Layer.as_jsonable()
 
     def reset(self):
         #
