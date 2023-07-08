@@ -33,11 +33,11 @@ class ModelClient(object):
         response = requests.get(self.URLHead + "/model/" + self.ModelName + "?reward=yes")
         return json.loads(response.text)
     
-    def update_weights(self, params, reward=None):
+    def update_weights(self, weights, reward=None):
         url = self.URLHead + "/model/" + self.ModelName
         if reward is not None:
             url += f"?reward={reward}"
-        response = requests.patch(url, data=serialize_weights(params))
+        response = requests.patch(url, data=serialize_weights(weights))
         if response.status_code // 100 != 2:
             print(response)
             print(response.text)

@@ -60,17 +60,17 @@ def deserialize_array(data):
         #print("deserialize_array: out:", out, out.data)
     return out, tail
 	
-def serialize_weights(params):
-    return b''.join([serialize_array(p) for p in params or []])
+def serialize_weights(weights):
+    return b''.join([serialize_array(p) for p in weights or []])
 
 def deserialize_weights(inp_bytes):
     if not inp_bytes:
         #print("deserialize: empty inp_bytes:", inp_bytes)
         return None
     inp_view = memoryview(inp_bytes)
-    params = []
+    weights = []
     while len(inp_view):
         array, inp_view = deserialize_array(inp_view)
-        params.append(array)
-    return params
+        weights.append(array)
+    return weights
 

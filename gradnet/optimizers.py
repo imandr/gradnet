@@ -9,11 +9,11 @@ class LayerOptimizer(object):
     def __str__(self):
         return f"[LayerOptimizer {self.ParamOptimizer.__class__.__name__}]"
     
-    def apply_deltas(self, grads, params):
+    def apply_deltas(self, grads, weights):
         #print(self,".deltas: grads:", grads)
         new_contexts = []
         deltas = []
-        for c, g, p in zip(self.Contexts, grads, params):
+        for c, g, p in zip(self.Contexts, grads, weights):
             d, c = self.ParamOptimizer.deltas(c, g, p)
             new_contexts.append(c)
             p[...] += d

@@ -4,8 +4,6 @@ from .util import make_list
 
 class Activation(Layer):
     
-    params = []
-    
     def configure(self, inputs):
         assert len(inputs) == 1
         return inputs[0].Shape

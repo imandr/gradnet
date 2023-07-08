@@ -9,6 +9,7 @@ class Dense(Layer):
         self.NOut = n
         self.NIn = None
         self.B = self.W = None
+        self.Params = {"NOut": n}
         
     def __str__(self):
         name = self.Name or "(unnamed)"
@@ -70,12 +71,10 @@ class Dense(Layer):
         return [gx], [gW, gb], None
 
     @property
-    def params(self):
-        return self.W, self.B
+    def weights(self):
+        return [self.W, self.B]
                 
 class Flatten(Layer):
-    
-    params = []
     
     def configure(self, inputs):
         assert len(inputs) == 1
@@ -95,7 +94,6 @@ class Flatten(Layer):
         
 class Transpose(Layer):
     
-    params = []
     def __init__(self, *map, name=None):
         Layer.__init__(self, name=name)
         assert all(x in map for x in range(len(map)))   # make sure each index appears once and only once
@@ -106,6 +104,7 @@ class Transpose(Layer):
         for i, m in enumerate(map):
             rev[m] = i
         self.Reversed = tuple(rev)
+        self.Params = {"Map": self.Map}
     
     def configure(self, inputs):
         assert len(inputs) == 1
@@ -125,11 +124,10 @@ class Transpose(Layer):
         
 class Concatenate(Layer):
     
-    params = []
-    
     def __init__(self, axis = -1, name=None):
         Layer.__init__(self, name=name)
         self.Axis = axis
+        self.Params = {"Axis": axis}
 
     def configure(self, inputs):
         assert len(inputs) >= 2
@@ -164,6 +162,3 @@ class Concatenate(Layer):
             x_grads.append(y_grads[tuple(selector)])
         #print("concatente: ygrads:", y_grads," ---> ", x_grads)
         return x_grads, None, None
-            
-    
-        

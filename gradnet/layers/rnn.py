@@ -78,7 +78,7 @@ class RNNLayer(Layer):
             
         x_grads = np.zeros_like(x)
         #print("rnn.grads: x_grads:", x_grads.shape)
-        gw = [np.zeros_like(w) for w in self.params]
+        gw = [np.zeros_like(w) for w in self.weights]
         gc = s_out_grads
         for i in range(n):
             t = i if self.Reversed else n-1-i
@@ -134,7 +134,7 @@ class RNN(RNNLayer):
         return (shape[0], self.Nout) if self.ReturnSequences else (self.Nout,)
         
     @property
-    def params(self):
+    def weights(self):
         return [self.W]
         
     def set_weights(self, w):

@@ -5,7 +5,7 @@ from types import FunctionType
 
 class LossBase(object):
     
-    def __init__(self, *params, name=None, callable=None):
+    def __init__(self, *inputs, name=None, callable=None):
         if name is None:
             if callable is not None:
                 if hasattr(callable, "Name"):
@@ -20,7 +20,7 @@ class LossBase(object):
         #print("LossBase create: name:", name)
 
         self.Name = name
-        self.Inputs = params
+        self.Inputs = inputs
         self.Grads = None
         self.Values = None
         self.Callable = callable

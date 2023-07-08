@@ -172,10 +172,6 @@ class Memory(RNNLayer):
         data = np.zeros((mb, self.C, self.L))
         return data
         
-    @property
-    def params(self):
-        return []
-        
     def init_context(self, x, state_in):
         T, b, d = x.shape       # T, minibatch, width (=L*3)
         assert x.shape[-1] == self.L*3+2

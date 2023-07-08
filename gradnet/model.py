@@ -68,7 +68,7 @@ class Model(object):
     def get_weights(self):
         lst = []
         for l in self.layers:
-            n = len(l.params)
+            n = len(l.weights)
             if n:
                 lst += list(l.get_weights())
         return lst
@@ -85,10 +85,10 @@ class Model(object):
         i = 0
         saved = self.get_weights()
         for l in self.layers:
-            n = len(l.params)
+            n = len(l.weights)
             if n:
                 if alpha != 1.0:
-                    for w, w1 in zip(l.params, source[i:i+n]):
+                    for w, w1 in zip(l.weights, source[i:i+n]):
                         w += alpha*(w1-w)
                 else:
                     l.set_weights(source[i:i+n].copy())
@@ -270,7 +270,36 @@ class Model(object):
             for l in o.links(seen):
                 yield l
             yield o
+
+    def sorted_layers(self):
+        # returns topologically sorted layer list from inputs to outputs
+        inputs_map = {}
+        links_by_id = {}
+        for l in self.links():
+            lid = id(l)
+            if lid not in links_by_id:
+                inputs_map[lid] = set(i.id() for i in l.Inputs)
+                links_by_id[lid] = l
+
+        #
+        # sort the links topologically, lowest inputs first
+        #
         
+        sorted_list = []
+        while inputs_map:
+            for lid, inputs in list(inputs_map.items()):
+                if not inputs:
+                    yield links_by_id[lid].Layer
+                    inputs_map.pop(lid)
+                    # remove this node from all its parents
+                    for _, parent_inputs in list(inputs_map.items()):
+                        parent_inputs.pop(lid)
+                    break
+            else:
+                raise ValueError("Circular links detected")
+        
+        
+
 if __name__ == "__main__":
     from graphs import Input
     from layers import Dense

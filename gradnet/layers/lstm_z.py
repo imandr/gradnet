@@ -46,7 +46,7 @@ class LSTM_Z(RNNLayer):
         return (shape[0], self.Nout) if self.ReturnSequences else (self.Nout,)
 
     @property
-    def params(self):
+    def weights(self):
         return [self.WIFN, self.WZ]
         
     def set_weights(self, weights):

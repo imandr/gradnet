@@ -25,7 +25,7 @@ class Model(Primitive):
         Primitive.__init__(self)
         self.Name = name
         self.Weights = None
-        self.SaveFile = save_dir + "/" + name + "_params.npz"
+        self.SaveFile = save_dir + "/" + name + "_weights.npz"
         self.MetaFile = save_dir + "/" + name + "_meta.json"
         self.LastActivity = 0
         
@@ -130,7 +130,7 @@ class Model(Primitive):
         if isinstance(weights, bytes):
             weights = deserialize_weights(weights)
         old_weights = self.get_weights()
-        #print("Model.get: old_params:", old_params)
+        #print("Model.get: old_weights:", old_weights)
         if old_weights is None:
             self.set_weights(weights, reward)
         else:
@@ -143,12 +143,12 @@ class Model(Primitive):
     
     @synchronized
     def reset(self):
-        last_params = self.Weights
+        last_weights = self.Weights
         self.Weights = self.RewardMA = self.RewardSqMA = None
         self.Sigma = 1.0
         try:    os.remove(self.SaveFile)
         except: pass
-        return last_params
+        return last_weights
     
     @synchronized
     def offload_if_idle(self):
@@ -190,7 +190,7 @@ class Handler(WPHandler):
             #print("handler: PUT: body:", request.body)
             if reward is not None: reward = float(reward)
             weights = model.update(deserialize_weights(request.body), reward)
-            #print("handler: PUT: params:", params)
+            #print("handler: PUT: weights:", weights)
             return 200, serialize_weights(weights) if weights else b''
             
         else:

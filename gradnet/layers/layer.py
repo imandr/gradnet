@@ -1,9 +1,9 @@
 from ..util import make_list
 from ..optimizers import LayerOptimizer
-from ..graphs import Link
+from ..graphs import Node
 import numpy as np
 
-class Input(Link):
+class Input(Node):
     def __init__(self, shape, name=None):
         self.Shape = shape      # tensor shape without the minibatch dimension
         self.Values = None
@@ -31,7 +31,7 @@ class Input(Link):
     def reset_gradsients(self):
         self.XGradSum = None
         
-class Constant(Link):
+class Constant(Node):
     def __init__(self, value=None, name=None):
         self.Values = np.ones((1,)) if value is None else value
         self.Inputs = []
@@ -53,14 +53,12 @@ class Constant(Link):
         
 class Layer(object):
     
-    params = []
-
     def __init__(self, name=None, activation=None):
         self.Name = name
+        self.Params = {}
         self.PGradSum = None
         self.NSamples = 0
         self.Configured = False
-        self.Params = []
         self.StateInGradients = self.XGradients = self.WeightsGradients = None     # saved for inofrmation purposes. Not used by the Layer itself
 
         if isinstance(activation, str):
@@ -73,7 +71,7 @@ class Layer(object):
         return "[Layer %s %s]" % (self.__class__.__name__, self.Name or "")        
 
     def link(self, *inputs):
-        from ..graphs import Link
+        from ..graphs import Node
         
         if len(inputs) == 1:
             if isinstance(inputs[0], (list, tuple)):
@@ -92,7 +90,7 @@ class Layer(object):
         else:
             shape = self.check_configuration(inputs)
             
-        lnk = Link(self, shape, inputs)
+        lnk = Node(self, shape, inputs)
         if self.Activation is not None:
             assert isinstance(self.Activation, Layer)
             lnk = self.Activation.link([lnk])
@@ -102,7 +100,7 @@ class Layer(object):
     
     def set_optimizer(self, param_optimizer):
         assert self.Configured, f"Layer {self}: Can not set layer optimizer before it is configured"
-        self.Optimizer = LayerOptimizer(self.params, param_optimizer)
+        self.Optimizer = LayerOptimizer(self.weights, param_optimizer)
         
     def reset_gradients(self):
         #print("Layer.reset_gradients:", self)
@@ -161,7 +159,7 @@ class Layer(object):
         self.WeightsGradients = None if self.PGradSum is None else [g.copy() for g in self.PGradSum]           # saved for inofrmation purposes. Not used by the Layer itself
         if self.PGradSum is not None and self.NSamples > 0:
             #grads = [g/self.NSamples for g in self.PGradSum]
-            deltas = self.Optimizer.apply_deltas(self.PGradSum, self.params)
+            deltas = self.Optimizer.apply_deltas(self.PGradSum, self.weights)
         self.reset_gradients()
         self.Deltas = deltas
         return deltas
@@ -171,13 +169,32 @@ class Layer(object):
             raise RuntimeError("Layer is not configured")
         self._set_weights(weights)
                 
+    def as_jsonable(self):
+        out = {
+            "class": self.__class__.__name__,
+            "name": self.Name,
+            "params": self.params()
+        }
+        if self.Activation is not None:
+            out["activation"] = self.Activation.as_jsonable()
+        return out
+
+    #
     # overridables
-    
+    #
+
+    @property
+    def weights(self):
+        return []
+
+    def params(self):
+        return self.Params
+
     def _set_weights(self, weights):
         raise NotImplementedError()
         
     def get_weights(self):
-        return [w.copy() for w in self.params]
+        return [w.copy() for w in self.weights]
         
     def configure(self, inputs):
         raise NotImplementedError()

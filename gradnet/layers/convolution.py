@@ -85,7 +85,7 @@ class Conv2D(Layer):
         return [gx], [gW, gb], None
         
     @property
-    def params(self):
+    def weights(self):
         return [self.W, self.b]
         
     def _set_weights(self, weights):
@@ -100,8 +100,6 @@ class Conv2D(Layer):
         return [self.W, self.b]
 
 class Pool(Layer):
-    
-    params = []
     
     def __init__(self, pool_w, pool_h, mode='max', **args):
         Layer.__init__(self, **args)

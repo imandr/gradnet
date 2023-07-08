@@ -117,10 +117,6 @@ class Memory(RNNLayer)
         self.Data = np.random.zeros((mb, self.C, self.L))
         return np.zeros((mb, 2, L))     # Kw[0] and P[1]
         
-    @property
-    def params(self):
-        return None
-        
     def init_context(self, x, state_in):
         T, b, d = x.shape       # T, minibatch, width (=L*3)
         assert b == self.MinibatchSize

@@ -41,7 +41,7 @@ class GRU(Layer):
         return self.Shape
 
     @property
-    def params(self):
+    def weights(self):
         return [self.W]
         
     def compute(self, xs, state_in):

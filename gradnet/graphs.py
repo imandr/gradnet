@@ -30,7 +30,7 @@ class Computer(object):
     def apply_deltas(self, deltas):
         raise NotImplementedError()
         
-class Link(object):
+class Node(object):
     
     def __init__(self, layer, shape, inputs):
         self.Inputs = inputs
@@ -39,7 +39,13 @@ class Link(object):
         self.Xs = self.Y = self.StateGrads = self.InState = self.OutState = self.Context = None
         if self.Layer is not None:
             self.Layer.reset_gradients()
-        
+
+    def id(self):
+        return id(self)
+
+    def __hash__(self):
+        return hash(id(self))
+
     def reset(self):
         #
         # get ready for next compute(), but do not reset accumulated grads, nor the state for stateful layers
@@ -84,7 +90,7 @@ class Link(object):
     def links(self, seen=None):
         if seen is None:    seen = set()
         for i in self.Inputs:
-            if isinstance(i, Link):
+            if isinstance(i, Node):
                 for l in i.links(seen):
                     if not id(l) in seen:
                         yield l
@@ -92,4 +98,16 @@ class Link(object):
                 if not id(i) in seen:
                     yield i
                     seen.add(id(i))
-            
+    
+    def inputs_map_rec(self, update_map=None):
+        # update_map: { node id -> (node, [input_id, ...])}
+        if update_map is None:
+            update_map = {}
+        my_id = self.id()
+        if my_id not in update_map:
+            update_map[my_id] = (self, [n.id() for n in self.Inputs])
+            for n in self.Inputs:
+                n.inputs_map_rec(update_map)
+        return update_map
+
+        
