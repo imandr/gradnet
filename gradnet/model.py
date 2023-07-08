@@ -1,5 +1,5 @@
 from .util import make_list
-import numpy as np
+import numpy as np, json
 from .optimizers import get_optimizer
 from .losses import get_loss
 import random
@@ -271,7 +271,7 @@ class Model(object):
                 yield l
             yield o
 
-    def sorted_layers(self):
+    def sorted_links(self):
         # returns topologically sorted layer list from inputs to outputs
         inputs_map = {}
         links_by_id = {}
@@ -289,14 +289,18 @@ class Model(object):
         while inputs_map:
             for lid, inputs in list(inputs_map.items()):
                 if not inputs:
-                    yield links_by_id[lid].Layer
+                    yield links_by_id[lid]
                     inputs_map.pop(lid)
                     # remove this node from all its parents
                     for _, parent_inputs in list(inputs_map.items()):
-                        parent_inputs.pop(lid)
+                        if lid in parent_inputs:    parent_inputs.remove(lid)
                     break
             else:
                 raise ValueError("Circular links detected")
+    
+    def as_json(self):
+        data = [l.as_jsonable() for l in self.sorted_links()]
+        return json.dumps(data)
         
         
 

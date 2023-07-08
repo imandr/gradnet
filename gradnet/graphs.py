@@ -47,7 +47,10 @@ class Node(object):
         return hash(id(self))
         
     def as_jsonable(self):
-        return self.Layer.as_jsonable()
+        data = self.Layer.as_jsonable()
+        data["id"] = self.id()
+        data["inputs"] = [n.id() for n in self.Inputs]
+        return data
 
     def reset(self):
         #

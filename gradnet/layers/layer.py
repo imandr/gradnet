@@ -33,6 +33,7 @@ class Input(Node):
 
     def as_jsonable(self):
         return {
+            "id": self.id(),
             "class": "Input",
             "name": self.Name,
             "params":   {
@@ -49,6 +50,7 @@ class Constant(Node):
 
     def as_jsonable(self):
         return {
+            "id": self.id(),
             "class": "Constant",
             "name": self.Name,
             "params":   {
