@@ -215,7 +215,7 @@ class Model(object):
         assert y_ is None or len(y_) == n
         assert all(len(d) == n for d in data.values())
 
-        print("before shuffle: x:", *tuple(xi.shape for xi in x))
+        #print("before shuffle: x:", *tuple(xi.shape for xi in x))
 
         if shuffle:
             inx = np.arange(n)

@@ -30,46 +30,38 @@ class Model(Primitive):
         self.LastActivity = 0
         
         self.Alpha = self.DefaultAlpha
-        self.RewardMA = self.RewardSqMA = self.RewardEstimate = None
+        self.RewardMA = self.RewardSqMA = None
         self.Sigma = 1.0
         self.Beta = beta or self.DefaultBeta
         
     @property
     def reward(self):
-        return self.RewardEstimate
+        return self.RewardMA
 
     def beta(self, reward=None):
         if reward is None:
+            if self.RewardMA is None:
+                return 1.0          # single tariner ?
             return self.Beta
         if self.RewardMA is None:
-            self.RewardMA = self.RewardEstimate = reward
+            self.RewardMA = reward
             self.RewardSqMA = reward**2
             return self.Beta
         sigma = self.Sigma
         if sigma == 0.0:
             return self.Beta
-        r = (reward - self.RewardMA)/(sigma + 0.001)*5
+        r = (reward - self.RewardMA)/(sigma + 0.001)
         if r < 0:
             beta = math.exp(r)/(1.0 + math.exp(r))
         else:
             beta = 1.0/(1.0 + math.exp(-r))
         return beta
 
-    def __beta(self, reward=None):
-        if reward is None:
-            return self.Beta
-        if self.RewardEstimate is None:
-            return 1.0
-        if reward > self.RewardEstimate:
-            return 1.0 - self.Beta
-        else:
-            return self.Beta
-
     @synchronized
     def update_sigma(self, reward):
         alpha = self.Alpha
         if self.RewardMA is None:
-            self.RewardMA = self.RewardEstimate = reward
+            self.RewardMA = reward
             self.RewardSqMA = reward**2
         old_reward_ma = self.RewardMA
         self.RewardMA += alpha*(reward - self.RewardMA)
@@ -93,8 +85,11 @@ class Model(Primitive):
         if isinstance(weights, bytes):
             weights = deserialize_weights(weights)
         self.Weights = weights
-        self.RewardMA = reward
-        self.RewardSqMA = reward**2
+        if reward is None:
+            self.RewardMA = self.RewardSqMA = None
+        else:
+            self.RewardMA = reward
+            self.RewardSqMA = reward**2
         self.Sigma = 1.0
         self.LastActivity = time.time()
         self.save()
@@ -104,7 +99,6 @@ class Model(Primitive):
         if self.Weights is not None:
             np.savez(self.SaveFile, *self.Weights, reward=[self.RewardMA])
         json.dump({
-            "reward_est": self.RewardEstimate,
             "reward_ma": self.RewardMA,
             "reward2_ma": self.RewardSqMA
         }, open(self.MetaFile, "w"))
@@ -124,7 +118,6 @@ class Model(Primitive):
             meta = json.load(open(self.MetaFile, "r"))
             self.RewardMA = meta.get("reward_ma")
             self.RewardSqMA = meta.get("reward2_ma")
-            self.RewardEst = meta.get("reward_est")
         except:
             pass
 
@@ -133,6 +126,7 @@ class Model(Primitive):
         if reward:
             self.update_sigma(reward)
         beta = self.beta(reward)
+        print("Handler.update: beta:", beta)
         if isinstance(weights, bytes):
             weights = deserialize_weights(weights)
         old_weights = self.get_weights()
@@ -141,9 +135,7 @@ class Model(Primitive):
             self.set_weights(weights, reward)
         else:
             self.Weights = [old + beta * (new - old) for old, new in zip(old_weights, weights)]
-            if reward is not None:
-                self.RewardEstimate += beta*(reward - self.RewardEstimate)
-            print(f"Weights for {self.Name} updated using beta:", beta, "     RewardEst/reward:", self.RewardEstimate, reward, "  sigma:", self.Sigma)
+            print(f"Weights for {self.Name} updated using beta:", beta, "  rewardMA/reward:", self.RewardMA, reward, "  sigma:", self.Sigma)
         self.LastActivity = time.time()
         self.save()
         print(f"model {self.Name} saved")
